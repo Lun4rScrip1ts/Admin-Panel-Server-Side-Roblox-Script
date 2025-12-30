@@ -257,3 +257,8 @@ UserInputService.InputBegan:Connect(function(i,g)
 		gui.Enabled = not gui.Enabled
 	end
 end)
+
+local TextChatService = game:GetService "TextChatService"
+local TextChannel = TextChatService:WaitForChild "TextChannels" : WaitForChild "RBXGeneral" :: TextChannel
+--parenthesis are optional in calls with one literal argument
+TextChannel:SendAsync "Created By @xLunarxZzRbxx~"
