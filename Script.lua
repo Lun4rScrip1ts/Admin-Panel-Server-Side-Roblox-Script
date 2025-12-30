@@ -6,6 +6,7 @@ local TweenService   = game:GetService("TweenService")
 local TeleportService= game:GetService("TeleportService")
 local UserInputService= game:GetService("UserInputService")
 local TextChatService= game:GetService("TextChatService")
+local Mouse = client:GetMouse()
 
 local client = Players.LocalPlayer
 local prefix = "!"
@@ -23,7 +24,7 @@ local cmds = {
 	"!god [plr]","!ungod [plr]",
 	"!invis [plr]","!vis [plr]",
 	"!fling [plr]","!tpall",
-	"!rejoin","!cmds"
+	"!rejoin","!cmds","!ping","!stopwatch","!clickTP"
 }
 
 ---------------------------------------------------------------- UTIL
@@ -39,10 +40,40 @@ end
 local function getHRP(p) return p.Character and p.Character:FindFirstChild("HumanoidRootPart") end
 local function getHum(p) return p.Character and p.Character:FindFirstChildOfClass("Humanoid") end
 
----------------------------------------------------------------- KILL (joint-break only)
-local function killPlayer(p) if not p then return end local char = p.Character if char then char:BreakJoints() end end
+---------------------------------------------------------------- NOTIFICATION
+local notifGui = Instance.new("ScreenGui", client.PlayerGui); notifGui.ResetOnSpawn = false
+local function notify(text, col)
+	col = col or Color3.fromRGB(57, 57, 57)
+	local f = Instance.new("Frame", notifGui)
+	f.Size = UDim2.new(0, 250, 0, 45)
+	f.Position = UDim2.new(1, 10, 0.9, 0)
+	f.BackgroundColor3 = col
+	f.BorderSizePixel = 0
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+	local l = Instance.new("TextLabel", f)
+	l.Size = UDim2.new(1, -10, 1, -10)
+	l.Position = UDim2.new(0, 5, 0, 5)
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.Font = Enum.Font.GothamBold
+	l.TextSize = 16
+	l.TextColor3 = Color3.new(1, 1, 1)
+	l.TextWrapped = true
+	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, -260, 0.9, 0)}):Play()
+	task.wait(4.5)
+	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, 10, 0.9, 0)}):Play()
+	task.wait(0.5)
+	f:Destroy()
+end
 
----------------------------------------------------------------- FREE-MOVE FLY
+---------------------------------------------------------------- KILL
+local function killPlayer(p)
+	if not p then return end
+	local char = p.Character
+	if char then char:BreakJoints() end
+end
+
+---------------------------------------------------------------- FREE-MOVE FLY (no void glitch)
 local flyData = {}
 local function fly(p, spd)
 	if flyData[p] or not getHRP(p) then return end
@@ -51,10 +82,10 @@ local function fly(p, spd)
 	local cam = workspace.CurrentCamera
 
 	local bg = Instance.new("BodyGyro", hrp)
-	bg.MaxTorque = Vector3.new(1e6,1e6,1e6)
+	bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
 	local bv = Instance.new("BodyVelocity", hrp)
-	bv.MaxForce = Vector3.new(1e6,1e6,1e6)
-	flyData[p] = {bg=bg,bv=bv,s=spd}
+	bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+	flyData[p] = {bg = bg, bv = bv, s = spd}
 
 	local function step()
 		if not flyData[p] then return end
@@ -66,20 +97,24 @@ local function fly(p, spd)
 		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cf.RightVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.yAxis end
 		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.yAxis end
-		bv.Velocity = dir.Unit * flyData[p].s
+		if dir.Magnitude > 0 then
+			bv.Velocity = dir.Unit * flyData[p].s
+		else
+			bv.Velocity = Vector3.new(0, 0, 0)
+		end
 		bg.CFrame = cf
 	end
 	RunService:BindToRenderStep("FreeFly"..p.Name, 200, step)
 end
 local function unfly(p)
 	local t = flyData[p]
-	if t then t.bg:Destroy(); t.bv:Destroy(); flyData[p]=nil; RunService:UnbindFromRenderStep("FreeFly"..p.Name) end
+	if t then t.bg:Destroy(); t.bv:Destroy(); flyData[p] = nil; RunService:UnbindFromRenderStep("FreeFly"..p.Name) end
 end
 
 ---------------------------------------------------------------- SPEED
 local function setspeed(p, n)
 	local hum = getHum(p) if not hum then return end
-	if not hum:FindFirstChild("CustSpeed") then Instance.new("NumberValue",hum).Name="CustSpeed" end
+	if not hum:FindFirstChild("CustSpeed") then Instance.new("NumberValue", hum).Name = "CustSpeed" end
 	hum.CustSpeed.Value = tonumber(n) or 16; hum.WalkSpeed = hum.CustSpeed.Value
 end
 local function resetspeed(p)
@@ -88,49 +123,49 @@ local function resetspeed(p)
 	hum.WalkSpeed = 16
 end
 
----------------------------------------------------------------- NOCLIP / CLIP
+---------------------------------------------------------------- NOCLIP / CLIP (no fling)
 local noclip = {}
 local function setnoclip(p, on)
 	local char = p.Character if not char then return end
-	if noclip[p] then noclip[p]:Disconnect(); noclip[p]=nil end
+	if noclip[p] then noclip[p]:Disconnect(); noclip[p] = nil end
 	if on then
 		noclip[p] = RunService.Stepped:Connect(function()
-			for _,v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end
+			for _, v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
 		end)
 	else
-		for _,v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=true end end
+		for _, v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = true end end
 	end
 end
 
----------------------------------------------------------------- ESP
+---------------------------------------------------------------- ESP (fixed unesp)
 local espt = {}
 local function unesp(p)
 	local t = espt[p] if not t then return end
-	for _,v in pairs(t) do v:Destroy() end; espt[p]=nil
+	for _, v in pairs(t) do v:Destroy() end; espt[p] = nil
 end
 local function esp(p)
 	if espt[p] then return end
-	local t = {}; espt[p]=t
+	local t = {}; espt[p] = t
 	local function build(ch)
 		if not ch then return end
 		local box = Instance.new("BoxHandleAdornment")
 		box.Adornee = getHRP(p) or ch:FindFirstChild("Head")
-		box.Size,box.Color3,box.AlwaysOnTop = Vector3.new(2,3,2),Color3.new(1,0,0),true
-		box.ZIndex,box.Parent = 5,ch
-		table.insert(t,box)
+		box.Size, box.Color3, box.AlwaysOnTop = Vector3.new(2, 3, 2), Color3.new(1, 0, 0), true
+		box.ZIndex, box.Parent = 5, ch
+		table.insert(t, box)
 		local bbg = Instance.new("BillboardGui")
-		bbg.Size,bbg.AlwaysOnTop,bbg.Adornee = UDim2.new(0,200,0,50),true,box.Adornee
-		bbg.StudsOffset = Vector3.new(0,3,0)
-		local txt = Instance.new("TextLabel",bbg)
-		txt.Size,txt.Text,txt.TextScaled = UDim2.new(1,0,1,0),p.Name,true
-		txt.BackgroundTransparency,txt.TextColor3 = 1,Color3.new(1,1,1)
-		bbg.Parent = ch; table.insert(t,bbg)
+		bbg.Size, bbg.AlwaysOnTop, bbg.Adornee = UDim2.new(0, 200, 0, 50), true, box.Adornee
+		bbg.StudsOffset = Vector3.new(0, 3, 0)
+		local txt = Instance.new("TextLabel", bbg)
+		txt.Size, txt.Text, txt.TextScaled = UDim2.new(1, 0, 1, 0), p.Name, true
+		txt.BackgroundTransparency, txt.TextColor3 = 1, Color3.new(1, 1, 1)
+		bbg.Parent = ch; table.insert(t, bbg)
 	end
 	build(p.Character)
-	local added; added = p.CharacterAdded:Connect(function(ch) build(ch) end); table.insert(t,added)
+	local added; added = p.CharacterAdded:Connect(function(ch) build(ch) end); table.insert(t, added)
 end
-local function espall() for _,v in ipairs(Players:GetPlayers()) do esp(v) end end
-local function unespall() for _,v in ipairs(Players:GetPlayers()) do unesp(v) end end
+local function espall() for _, v in ipairs(Players:GetPlayers()) do esp(v) end end
+local function unespall() for _, v in ipairs(Players:GetPlayers()) do unesp(v) end end
 
 ---------------------------------------------------------------- HEAL
 local function heal(p)
@@ -139,24 +174,24 @@ end
 
 ---------------------------------------------------------------- TP
 local function tp(p1, p2)
-	local h1,h2 = getHRP(p1), getHRP(p2)
-	if h1 and h2 then h1.CFrame = h2.CFrame + Vector3.new(0,2,0) end
+	local h1, h2 = getHRP(p1), getHRP(p2)
+	if h1 and h2 then h1.CFrame = h2.CFrame + Vector3.new(0, 2, 0) end
 end
 local function bring(to, tgt) tp(tgt, to) end
 local function goto(me, tgt) tp(me, tgt) end
 local function tpall()
-	for _,v in ipairs(Players:GetPlayers()) do if v~=client then tp(v, client) end end
+	for _, v in ipairs(Players:GetPlayers()) do if v ~= client then tp(v, client) end end
 end
 
 ---------------------------------------------------------------- MISC
 local function jumppower(p, pow)
-	local hum = getHum(p) if hum then hum.UseJumpPower=true; hum.JumpPower=tonumber(pow) or 50 end
+	local hum = getHum(p) if hum then hum.UseJumpPower = true; hum.JumpPower = tonumber(pow) or 50 end
 end
 local function sit(p)
-	local hum = getHum(p) if hum then hum.Sit=true end
+	local hum = getHum(p) if hum then hum.Sit = true end
 end
 local function lay(p)
-	local hum = getHum(p) if hum then hum.Sit=true; getHRP(p).CFrame = getHRP(p).CFrame*CFrame.Angles(math.pi/2,0,0) end
+	local hum = getHum(p) if hum then hum.Sit = true; getHRP(p).CFrame = getHRP(p).CFrame * CFrame.Angles(math.pi/2, 0, 0) end
 end
 
 ---------------------------------------------------------------- FREEZE
@@ -164,11 +199,11 @@ local frozen = {}
 local function freeze(p)
 	local hum = getHum(p) if not hum or frozen[p] then return end
 	frozen[p] = {ws = hum.WalkSpeed, jp = hum.JumpPower, jh = hum.JumpHeight}
-	hum.WalkSpeed, hum.JumpPower, hum.JumpHeight = 0,0,0
+	hum.WalkSpeed, hum.JumpPower, hum.JumpHeight = 0, 0, 0
 end
 local function unfreeze(p)
 	local t = frozen[p]; local hum = getHum(p)
-	if t and hum then hum.WalkSpeed, hum.JumpPower, hum.JumpHeight = t.ws, t.jp, t.jh; frozen[p]=nil end
+	if t and hum then hum.WalkSpeed, hum.JumpPower, hum.JumpHeight = t.ws, t.jp, t.jh; frozen[p] = nil end
 end
 
 ---------------------------------------------------------------- GOD
@@ -176,22 +211,22 @@ local gods = {}
 local function god(p)
 	if gods[p] then return end
 	local hum = getHum(p) if not hum then return end
-	gods[p] = hum.HealthChanged:Connect(function() if hum.Health<hum.MaxHealth then hum.Health=hum.MaxHealth end end)
+	gods[p] = hum.HealthChanged:Connect(function() if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end end)
 end
 local function ungod(p)
-	local c = gods[p] if c then c:Disconnect(); gods[p]=nil end
+	local c = gods[p] if c then c:Disconnect(); gods[p] = nil end
 end
 
 ---------------------------------------------------------------- INVIS
 local invis = {}
 local function invisP(p)
 	if invis[p] or not p.Character then return end
-	for _,v in ipairs(p.Character:GetChildren()) do if v:IsA("BasePart") then v.Transparency = 1 end end
+	for _, v in ipairs(p.Character:GetChildren()) do if v:IsA("BasePart") then v.Transparency = 1 end end
 	invis[p] = true
 end
 local function visP(p)
 	if not invis[p] or not p.Character then return end
-	for _,v in ipairs(p.Character:GetChildren()) do if v:IsA("BasePart") then v.Transparency = 0 end end
+	for _, v in ipairs(p.Character:GetChildren()) do if v:IsA("BasePart") then v.Transparency = 0 end end
 	invis[p] = nil
 end
 
@@ -199,12 +234,70 @@ end
 local function fling(p)
 	local hrp = getHRP(p) if not hrp then return end
 	local v = Instance.new("BodyVelocity", hrp)
-	v.MaxForce, v.Velocity = Vector3.new(1e6,1e6,1e6), Vector3.new(math.random(-2e4,2e4), 2e4, math.random(-2e4,2e4))
+	v.MaxForce, v.Velocity = Vector3.new(1e6, 1e6, 1e6), Vector3.new(math.random(-2e4, 2e4), 2e4, math.random(-2e4, 2e4))
 	task.wait(0.25); v:Destroy()
 end
 
 ---------------------------------------------------------------- REJOIN
 local function rejoin() TeleportService:Teleport(game.PlaceId, client) end
+
+---------------------------------------------------------------- PING
+local function showPing()
+	local ping = tonumber(string.split(tostring(client:GetNetworkPing() * 1000), ".")[1]) or 0
+	notify("Ping: " .. ping .. " ms", Color3.fromRGB(0, 170, 255))
+end
+
+---------------------------------------------------------------- STOPWATCH
+local stopGui = nil
+local function toggleStopwatch()
+	if stopGui then stopGui:Destroy(); stopGui = nil; return end
+	stopGui = Instance.new("ScreenGui", client.PlayerGui); stopGui.ResetOnSpawn = false
+	local f = Instance.new("Frame", stopGui)
+	f.Size = UDim2.new(0, 200, 0, 100)
+	f.Position = UDim2.new(0.5, -100, 0.5, -50)
+	f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	f.BorderSizePixel = 0
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+	local x = Instance.new("TextButton", f)
+	x.Size = UDim2.new(0, 20, 0, 20)
+	x.Position = UDim2.new(1, -22, 0, 2)
+	x.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+	x.Text = "X"
+	x.Font = Enum.Font.GothamBold
+	x.TextSize = 14
+	x.TextColor3 = Color3.white
+	x.AutoButtonColor = false
+	Instance.new("UICorner", x).CornerRadius = UDim.new(0, 4)
+	x.MouseButton1Click:Connect(function() stopGui:Destroy(); stopGui = nil end)
+	local lbl = Instance.new("TextLabel", f)
+	lbl.Size = UDim2.new(1, -10, 1, -30)
+	lbl.Position = UDim2.new(0, 5, 0, 25)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = "0.000"
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 28
+	lbl.TextColor3 = Color3.new(1, 1, 1)
+	local start = os.clock()
+	local con = RunService.Heartbeat:Connect(function()
+		if not stopGui then con:Disconnect(); return end
+		lbl.Text = string.format("%.3f", os.clock() - start)
+	end)
+end
+
+---------------------------------------------------------------- CLICK TP
+local clickTP = false
+local function toggleClickTP()
+	clickTP = not clickTP
+	notify("Click TP " .. (clickTP and "ON" or "OFF"))
+end
+Mouse.Button1Down:Connect(function()
+	if not clickTP then return end
+	local target = Mouse.Target
+	if target and target:IsA("BasePart") then
+		local hrp = getHRP(client)
+		if hrp then hrp.CFrame = Mouse.Hit * CFrame.new(0, 3, 0) end
+	end
+end)
 
 ---------------------------------------------------------------- GUI
 local gui = Instance.new("ScreenGui", client.PlayerGui); gui.ResetOnSpawn = false
@@ -243,9 +336,9 @@ list.BackgroundTransparency = 1
 
 local lbls = {}
 local function refresh(filter)
-	for _,v in ipairs(lbls) do v:Destroy() end; lbls = {}
+	for _, v in ipairs(lbls) do v:Destroy() end; lbls = {}
 	local y = 0
-	for _,cmd in ipairs(cmds) do
+	for _, cmd in ipairs(cmds) do
 		if not filter or cmd:lower():find(filter:lower()) then
 			local l = Instance.new("TextLabel", list)
 			l.Size = UDim2.new(1, -10, 0, 26)
@@ -285,53 +378,53 @@ end)
 
 ---------------------------------------------------------------- CHAT HANDLER
 client.Chatted:Connect(function(msg)
-	if msg:sub(1,1)~=prefix then return end
+	if msg:sub(1, 1) ~= prefix then return end
 	local args = msg:sub(2):split(" ")
-	local cmd  = table.remove(args,1):lower()
+	local cmd  = table.remove(args, 1):lower()
+	notify("!" .. cmd, Color3.fromRGB(60, 60, 60))
 
-	if cmd=="cmds" then gui.Enabled = not gui.Enabled
-	elseif cmd=="rejoin" then rejoin()
-		elseif cmd=="kill" then
+	if cmd == "cmds" then gui.Enabled = not gui.Enabled
+	elseif cmd == "rejoin" then rejoin()
+	elseif cmd == "kill" then
 		local name = args[1] or ""
-		if name:lower()=="all" then
-			for _,p in ipairs(Players:GetPlayers()) do killPlayer(p) end
-		else
-			local tgt = getPlr(name)
-			if tgt then killPlayer(tgt) end
-		end
-	elseif cmd=="fly" then fly(getPlr(args[1]), args[2])
-	elseif cmd=="unfly" then unfly(getPlr(args[1]))
-	elseif cmd=="speed" then setspeed(getPlr(args[1]), args[2])
-	elseif cmd=="resetspeed" then resetspeed(getPlr(args[1]))
-	elseif cmd=="noclip" then setnoclip(getPlr(args[1]), true)
-	elseif cmd=="clip" then setnoclip(getPlr(args[1]), false)
-	elseif cmd=="esp" then
+		if name:lower() == "all" then for _, p in ipairs(Players:GetPlayers()) do killPlayer(p) end
+		else local tgt = getPlr(name); if tgt then killPlayer(tgt) end end
+	elseif cmd == "fly" then fly(getPlr(args[1]), args[2])
+	elseif cmd == "unfly" then unfly(getPlr(args[1]))
+	elseif cmd == "speed" then setspeed(getPlr(args[1]), args[2])
+	elseif cmd == "resetspeed" then resetspeed(getPlr(args[1]))
+	elseif cmd == "noclip" then setnoclip(getPlr(args[1]), true)
+	elseif cmd == "clip" then setnoclip(getPlr(args[1]), false)
+	elseif cmd == "esp" then
 		local tgt = args[1] or ""
-		if tgt:lower()=="all" then espall() else esp(getPlr(tgt)) end
-	elseif cmd=="unesp" then
+		if tgt:lower() == "all" then espall() else esp(getPlr(tgt)) end
+	elseif cmd == "unesp" then
 		local tgt = args[1] or ""
-		if tgt:lower()=="all" then unespall() else unesp(getPlr(tgt)) end
-	elseif cmd=="heal" then heal(getPlr(args[1]))
-	elseif cmd=="tp" then tp(getPlr(args[1]), getPlr(args[2]))
-	elseif cmd=="bring" then bring(client, getPlr(args[1]))
-	elseif cmd=="to" then goto(client, getPlr(args[1]))
-	elseif cmd=="tpall" then tpall()
-	elseif cmd=="jump" then jumppower(client, args[1])
-	elseif cmd=="sit" then sit(client)
-	elseif cmd=="lay" then lay(client)
-	elseif cmd=="freeze" then freeze(getPlr(args[1]))
-	elseif cmd=="unfreeze" then unfreeze(getPlr(args[1]))
-	elseif cmd=="god" then god(getPlr(args[1]))
-	elseif cmd=="ungod" then ungod(getPlr(args[1]))
-	elseif cmd=="invis" then invisP(getPlr(args[1]))
-	elseif cmd=="vis" then visP(getPlr(args[1]))
-	elseif cmd=="fling" then fling(getPlr(args[1]))
+		if tgt:lower() == "all" then unespall() else unesp(getPlr(tgt)) end
+	elseif cmd == "heal" then heal(getPlr(args[1]))
+	elseif cmd == "tp" then tp(getPlr(args[1]), getPlr(args[2]))
+	elseif cmd == "bring" then bring(client, getPlr(args[1]))
+	elseif cmd == "to" then goto(client, getPlr(args[1]))
+	elseif cmd == "tpall" then tpall()
+	elseif cmd == "jump" then jumppower(client, args[1])
+	elseif cmd == "sit" then sit(client)
+	elseif cmd == "lay" then lay(client)
+	elseif cmd == "freeze" then freeze(getPlr(args[1]))
+	elseif cmd == "unfreeze" then unfreeze(getPlr(args[1]))
+	elseif cmd == "god" then god(getPlr(args[1]))
+	elseif cmd == "ungod" then ungod(getPlr(args[1]))
+	elseif cmd == "invis" then invisP(getPlr(args[1]))
+	elseif cmd == "vis" then visP(getPlr(args[1]))
+	elseif cmd == "fling" then fling(getPlr(args[1]))
+	elseif cmd == "ping" then showPing()
+	elseif cmd == "stopwatch" then toggleStopwatch()
+	elseif cmd == "clickTP" then toggleClickTP()
 	end
 end)
 
 ---------------------------------------------------------------- HOTKEY
-UserInputService.InputBegan:Connect(function(i,g)
-	if not g and i.KeyCode==Enum.KeyCode.RightShift then gui.Enabled = not gui.Enabled end
+UserInputService.InputBegan:Connect(function(i, g)
+	if not g and i.KeyCode == Enum.KeyCode.RightShift then gui.Enabled = not gui.Enabled end
 end)
 
 ---------------------------------------------------------------- LOAD MSG
