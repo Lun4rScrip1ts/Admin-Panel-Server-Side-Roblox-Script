@@ -1,4 +1,5 @@
 --  Lunar Admin  |  prefix : !
+--  fixed fly, clip, unesp + notifications, ping, stopwatch, clickTP
 ---------------------------------------------------------------- SERVICES
 local Players        = game:GetService("Players")
 local RunService     = game:GetService("RunService")
