@@ -1,5 +1,4 @@
 --  Lunar Admin  |  prefix : !
---  fixed fly, clip, unesp + notifications, ping, stopwatch, clickTP
 ---------------------------------------------------------------- SERVICES
 local Players        = game:GetService("Players")
 local RunService     = game:GetService("RunService")
@@ -7,9 +6,9 @@ local TweenService   = game:GetService("TweenService")
 local TeleportService= game:GetService("TeleportService")
 local UserInputService= game:GetService("UserInputService")
 local TextChatService= game:GetService("TextChatService")
-local Mouse = client:GetMouse()
 
 local client = Players.LocalPlayer
+local Mouse = client:GetMouse()
 local prefix = "!"
 
 ---------------------------------------------------------------- COMMAND LIST
@@ -41,7 +40,7 @@ end
 local function getHRP(p) return p.Character and p.Character:FindFirstChild("HumanoidRootPart") end
 local function getHum(p) return p.Character and p.Character:FindFirstChildOfClass("Humanoid") end
 
----------------------------------------------------------------- NOTIFICATION
+---------------------------------------------------------------- NOTIFICATION (5-sec fade) – does NOT delay commands
 local notifGui = Instance.new("ScreenGui", client.PlayerGui); notifGui.ResetOnSpawn = false
 local function notify(text, col)
 	col = col or Color3.fromRGB(57, 57, 57)
@@ -61,10 +60,12 @@ local function notify(text, col)
 	l.TextColor3 = Color3.new(1, 1, 1)
 	l.TextWrapped = true
 	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, -260, 0.9, 0)}):Play()
-	task.wait(4.5)
-	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, 10, 0.9, 0)}):Play()
-	task.wait(0.5)
-	f:Destroy()
+	task.spawn(function()
+		task.wait(4.5)
+		TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, 10, 0.9, 0)}):Play()
+		task.wait(0.5)
+		f:Destroy()
+	end)
 end
 
 ---------------------------------------------------------------- KILL
@@ -124,7 +125,7 @@ local function resetspeed(p)
 	hum.WalkSpeed = 16
 end
 
----------------------------------------------------------------- NOCLIP / CLIP (no fling)
+---------------------------------------------------------------- NOCLIP / CLIP
 local noclip = {}
 local function setnoclip(p, on)
 	local char = p.Character if not char then return end
@@ -139,6 +140,151 @@ local function setnoclip(p, on)
 end
 
 ---------------------------------------------------------------- ESP (fixed unesp)
+--  Lunar Admin  |  prefix : !
+--  fixes: stopwatch, clickTP, ESP outline-only + name
+--  adds: private command box, ragdoll/unragdoll (R6/R15)
+---------------------------------------------------------------- SERVICES
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local TweenService   = game:GetService("TweenService")
+local TeleportService= game:GetService("TeleportService")
+local UserInputService= game:GetService("UserInputService")
+local TextChatService= game:GetService("TextChatService")
+
+local client = Players.LocalPlayer
+local Mouse = client:GetMouse()
+local prefix = "!"
+
+---------------------------------------------------------------- COMMAND LIST
+local cmds = {
+	"!fly [plr] [speed]","!unfly [plr]",
+	"!speed [plr] [num]","!resetspeed [plr]",
+	"!noclip [plr]","!clip [plr]",
+	"!esp [plr/all]","!unesp [plr/all]",
+	"!heal [plr]","!kill [plr/all/me]",
+	"!tp [p1] [p2]","!bring [plr]","!to [plr]",
+	"!jump [pow]","!sit","!lay",
+	"!freeze [plr]","!unfreeze [plr]",
+	"!god [plr]","!ungod [plr]",
+	"!invis [plr]","!vis [plr]",
+	"!fling [plr]","!tpall",
+	"!rejoin","!cmds","!ping","!stopwatch","!clickTP",
+	"!ragdoll","!unragdoll"
+}
+
+---------------------------------------------------------------- UTIL
+local function getPlr(str)
+	if not str or str:lower()=="me" then return client end
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p.Name:lower():sub(1,#str)==str:lower() or p.DisplayName:lower():sub(1,#str)==str:lower() then
+			return p
+		end
+	end
+	return nil
+end
+local function getHRP(p) return p.Character and p.Character:FindFirstChild("HumanoidRootPart") end
+local function getHum(p) return p.Character and p.Character:FindFirstChildOfClass("Humanoid") end
+
+---------------------------------------------------------------- NOTIFICATION (5-sec fade) – does NOT delay commands
+local notifGui = Instance.new("ScreenGui", client.PlayerGui); notifGui.ResetOnSpawn = false
+local function notify(text, col)
+	col = col or Color3.fromRGB(57, 57, 57)
+	local f = Instance.new("Frame", notifGui)
+	f.Size = UDim2.new(0, 250, 0, 45)
+	f.Position = UDim2.new(1, 10, 0.9, 0)
+	f.BackgroundColor3 = col
+	f.BorderSizePixel = 0
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+	local l = Instance.new("TextLabel", f)
+	l.Size = UDim2.new(1, -10, 1, -10)
+	l.Position = UDim2.new(0, 5, 0, 5)
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.Font = Enum.Font.GothamBold
+	l.TextSize = 16
+	l.TextColor3 = Color3.new(1, 1, 1)
+	l.TextWrapped = true
+	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, -260, 0.9, 0)}):Play()
+	task.spawn(function()
+		task.wait(4.5)
+		TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, 10, 0.9, 0)}):Play()
+		task.wait(0.5)
+		f:Destroy()
+	end)
+end
+
+---------------------------------------------------------------- KILL
+local function killPlayer(p)
+	if not p then return end
+	local char = p.Character
+	if char then char:BreakJoints() end
+end
+
+---------------------------------------------------------------- FREE-MOVE FLY (no void glitch)
+local flyData = {}
+local function fly(p, spd)
+	if flyData[p] or not getHRP(p) then return end
+	spd = tonumber(spd) or 50
+	local hrp = getHRP(p)
+	local cam = workspace.CurrentCamera
+
+	local bg = Instance.new("BodyGyro", hrp)
+	bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+	local bv = Instance.new("BodyVelocity", hrp)
+	bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+	flyData[p] = {bg = bg, bv = bv, s = spd}
+
+	local function step()
+		if not flyData[p] then return end
+		local cf = cam.CFrame
+		local dir = Vector3.new()
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cf.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cf.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cf.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cf.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.yAxis end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.yAxis end
+		if dir.Magnitude > 0 then
+			bv.Velocity = dir.Unit * flyData[p].s
+		else
+			bv.Velocity = Vector3.new(0, 0, 0)
+		end
+		bg.CFrame = cf
+	end
+	RunService:BindToRenderStep("FreeFly"..p.Name, 200, step)
+end
+local function unfly(p)
+	local t = flyData[p]
+	if t then t.bg:Destroy(); t.bv:Destroy(); flyData[p] = nil; RunService:UnbindFromRenderStep("FreeFly"..p.Name) end
+end
+
+---------------------------------------------------------------- SPEED
+local function setspeed(p, n)
+	local hum = getHum(p) if not hum then return end
+	if not hum:FindFirstChild("CustSpeed") then Instance.new("NumberValue", hum).Name = "CustSpeed" end
+	hum.CustSpeed.Value = tonumber(n) or 16; hum.WalkSpeed = hum.CustSpeed.Value
+end
+local function resetspeed(p)
+	local hum = getHum(p) if not hum then return end
+	if hum:FindFirstChild("CustSpeed") then hum.CustSpeed:Destroy() end
+	hum.WalkSpeed = 16
+end
+
+---------------------------------------------------------------- NOCLIP / CLIP
+local noclip = {}
+local function setnoclip(p, on)
+	local char = p.Character if not char then return end
+	if noclip[p] then noclip[p]:Disconnect(); noclip[p] = nil end
+	if on then
+		noclip[p] = RunService.Stepped:Connect(function()
+			for _, v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+		end)
+	else
+		for _, v in ipairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = true end end
+	end
+end
+
+---------------------------------------------------------------- ESP (outline + name only)
 local espt = {}
 local function unesp(p)
 	local t = espt[p] if not t then return end
@@ -149,11 +295,13 @@ local function esp(p)
 	local t = {}; espt[p] = t
 	local function build(ch)
 		if not ch then return end
+		-- outline box
 		local box = Instance.new("BoxHandleAdornment")
 		box.Adornee = getHRP(p) or ch:FindFirstChild("Head")
 		box.Size, box.Color3, box.AlwaysOnTop = Vector3.new(2, 3, 2), Color3.new(1, 0, 0), true
 		box.ZIndex, box.Parent = 5, ch
 		table.insert(t, box)
+		-- name tag
 		local bbg = Instance.new("BillboardGui")
 		bbg.Size, bbg.AlwaysOnTop, bbg.Adornee = UDim2.new(0, 200, 0, 50), true, box.Adornee
 		bbg.StudsOffset = Vector3.new(0, 3, 0)
@@ -244,20 +392,21 @@ local function rejoin() TeleportService:Teleport(game.PlaceId, client) end
 
 ---------------------------------------------------------------- PING
 local function showPing()
-	local ping = tonumber(string.split(tostring(client:GetNetworkPing() * 1000), ".")[1]) or 0
+	local ping = tonumber(string.format("%.0f", client:GetNetworkPing() * 1000))
 	notify("Ping: " .. ping .. " ms", Color3.fromRGB(0, 170, 255))
 end
 
----------------------------------------------------------------- STOPWATCH
+---------------------------------------------------------------- STOPWATCH (counts hundredths)
 local stopGui = nil
 local function toggleStopwatch()
 	if stopGui then stopGui:Destroy(); stopGui = nil; return end
 	stopGui = Instance.new("ScreenGui", client.PlayerGui); stopGui.ResetOnSpawn = false
 	local f = Instance.new("Frame", stopGui)
 	f.Size = UDim2.new(0, 200, 0, 100)
-	f.Position = UDim2.new(0.5, -100, 0.5, -50)
+	f.Position = UDim2.new(1, 10, 0.5, -50)
 	f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 	f.BorderSizePixel = 0
+	f.Active = true; f.Draggable = true
 	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
 	local x = Instance.new("TextButton", f)
 	x.Size = UDim2.new(0, 20, 0, 20)
@@ -274,15 +423,16 @@ local function toggleStopwatch()
 	lbl.Size = UDim2.new(1, -10, 1, -30)
 	lbl.Position = UDim2.new(0, 5, 0, 25)
 	lbl.BackgroundTransparency = 1
-	lbl.Text = "0.000"
+	lbl.Text = "0.00"
 	lbl.Font = Enum.Font.GothamBold
 	lbl.TextSize = 28
 	lbl.TextColor3 = Color3.new(1, 1, 1)
 	local start = os.clock()
 	local con = RunService.Heartbeat:Connect(function()
 		if not stopGui then con:Disconnect(); return end
-		lbl.Text = string.format("%.3f", os.clock() - start)
+		lbl.Text = string.format("%.2f", os.clock() - start)
 	end)
+	TweenService:Create(f, TweenInfo.new(0.5), {Position = UDim2.new(1, -210, 0.5, -50)}):Play()
 end
 
 ---------------------------------------------------------------- CLICK TP
@@ -300,7 +450,122 @@ Mouse.Button1Down:Connect(function()
 	end
 end)
 
----------------------------------------------------------------- GUI
+---------------------------------------------------------------- PRIVATE COMMAND BOX
+local cmdBox = Instance.new("ScreenGui", client.PlayerGui); cmdBox.ResetOnSpawn = false
+local frame = Instance.new("Frame", cmdBox)
+frame.Size = UDim2.new(0, 250, 0, 40)
+frame.Position = UDim2.new(1, 10, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true; frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+local box = Instance.new("TextBox", frame)
+box.Size = UDim2.new(1, -10, 1, -10)
+box.Position = UDim2.new(0, 5, 0, 5)
+box.BackgroundTransparency = 1
+box.PlaceholderText = "Type command here..."
+box.Font = Enum.Font.Gotham
+box.TextSize = 14
+box.TextColor3 = Color3.new(1, 1, 1)
+box.ClearTextOnFocus = false
+box.FocusLost:Connect(function(enter)
+	if not enter then return end
+	local msg = box.Text
+	box.Text = ""
+	-- fire same handler as chat
+	if msg:sub(1, 1) == prefix then
+		local args = msg:sub(2):split(" ")
+		local cmd = table.remove(args, 1):lower()
+		notify("!" .. cmd, Color3.fromRGB(60, 60, 60))
+		-- duplicate of chat handler below
+		if cmd == "cmds" then gui.Enabled = not gui.Enabled
+		elseif cmd == "rejoin" then rejoin()
+		elseif cmd == "kill" then
+			local name = args[1] or ""
+			if name:lower() == "all" then for _, p in ipairs(Players:GetPlayers()) do killPlayer(p) end
+			else local tgt = getPlr(name); if tgt then killPlayer(tgt) end end
+		elseif cmd == "fly" then fly(getPlr(args[1]), args[2])
+		elseif cmd == "unfly" then unfly(getPlr(args[1]))
+		elseif cmd == "speed" then setspeed(getPlr(args[1]), args[2])
+		elseif cmd == "resetspeed" then resetspeed(getPlr(args[1]))
+		elseif cmd == "noclip" then setnoclip(getPlr(args[1]), true)
+		elseif cmd == "clip" then setnoclip(getPlr(args[1]), false)
+		elseif cmd == "esp" then
+			local tgt = args[1] or ""
+			if tgt:lower() == "all" then espall() else esp(getPlr(tgt)) end
+		elseif cmd == "unesp" then
+			local tgt = args[1] or ""
+			if tgt:lower() == "all" then unespall() else unesp(getPlr(tgt)) end
+		elseif cmd == "heal" then heal(getPlr(args[1]))
+		elseif cmd == "tp" then tp(getPlr(args[1]), getPlr(args[2]))
+		elseif cmd == "bring" then bring(client, getPlr(args[1]))
+		elseif cmd == "to" then goto(client, getPlr(args[1]))
+		elseif cmd == "tpall" then tpall()
+		elseif cmd == "jump" then jumppower(client, args[1])
+		elseif cmd == "sit" then sit(client)
+		elseif cmd == "lay" then lay(client)
+		elseif cmd == "freeze" then freeze(getPlr(args[1]))
+		elseif cmd == "unfreeze" then unfreeze(getPlr(args[1]))
+		elseif cmd == "god" then god(getPlr(args[1]))
+		elseif cmd == "ungod" then ungod(getPlr(args[1]))
+		elseif cmd == "invis" then invisP(getPlr(args[1]))
+		elseif cmd == "vis" then visP(getPlr(args[1]))
+		elseif cmd == "fling" then fling(getPlr(args[1]))
+		elseif cmd == "ping" then showPing()
+		elseif cmd == "stopwatch" then toggleStopwatch()
+		elseif cmd == "clickTP" then toggleClickTP()
+		elseif cmd == "ragdoll" then ragdoll(client)
+		elseif cmd == "unragdoll" then unragdoll(client)
+		end
+	end
+end)
+TweenService:Create(frame, TweenInfo.new(0.5), {Position = UDim2.new(1, -260, 0.2, 0)}):Play()
+
+---------------------------------------------------------------- RAGDOLL (R6 & R15)
+local ragData = {}
+local function ragdoll(p)
+	if ragData[p] or not p.Character then return end
+	local char = p.Character
+	ragData[p] = {}
+	-- disable states
+	for _, v in ipairs(char:GetDescendants()) do
+		if v:IsA("Motor6D") then
+			local socket = Instance.new("BallSocketConstraint")
+			socket.Name = "RagSocket"
+			socket.Attachment0 = v.Part0:FindFirstChildWhichIsA("Attachment") or v.Part0:FindFirstChildWhichIsA("WrapTarget") or Instance.new("Attachment", v.Part0)
+			socket.Attachment1 = v.Part1:FindFirstChildWhichIsA("Attachment") or v.Part1:FindFirstChildWhichIsA("WrapTarget") or Instance.new("Attachment", v.Part1)
+			socket.Parent = v.Part0
+			v.Enabled = false
+			table.insert(ragData[p], v)
+		end
+	end
+	local hum = getHum(p)
+	if hum then
+		hum.PlatformStand = true
+		hum.AutoRotate = false
+	end
+	notify("Ragdolled", Color3.fromRGB(255, 0, 0))
+end
+local function unragdoll(p)
+	if not ragData[p] or not p.Character then return end
+	local char = p.Character
+	-- re-enable motors
+	for _, mot in ipairs(ragData[p]) do
+		if mot and mot.Parent then
+			mot.Enabled = true
+			local socket = mot.Part0:FindFirstChild("RagSocket")
+			if socket then socket:Destroy() end
+		end
+	end
+	ragData[p] = nil
+	local hum = getHum(p)
+	if hum then
+		hum.PlatformStand = false
+		hum.AutoRotate = true
+	end
+	notify("Un-ragdolled", Color3.fromRGB(0, 255, 0))
+end
+
+---------------------------------------------------------------- GUI (draggable, slides in from right)
 local gui = Instance.new("ScreenGui", client.PlayerGui); gui.ResetOnSpawn = false
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.new(0, 320, 0, 420)
@@ -420,6 +685,8 @@ client.Chatted:Connect(function(msg)
 	elseif cmd == "ping" then showPing()
 	elseif cmd == "stopwatch" then toggleStopwatch()
 	elseif cmd == "clickTP" then toggleClickTP()
+	elseif cmd == "ragdoll" then ragdoll(client)
+	elseif cmd == "unragdoll" then unragdoll(client)
 	end
 end)
 
@@ -429,7 +696,59 @@ UserInputService.InputBegan:Connect(function(i, g)
 end)
 
 ---------------------------------------------------------------- LOAD MSG
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local TextChatService = game:GetService("TextChatService")
+
+local player = Players.LocalPlayer
+
+----------------------------------------------------------------
+-- WATERMARK LOADER (BLOCKING)
+----------------------------------------------------------------
+local function showWatermarkAndWait()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "LunarLoader"
+	gui.ResetOnSpawn = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	local label = Instance.new("TextLabel")
+	label.Parent = gui
+	label.Size = UDim2.new(0,260,0,22)
+	label.Position = UDim2.new(0.5,0,0.88,0)
+	label.AnchorPoint = Vector2.new(0.5,0)
+	label.BackgroundTransparency = 1
+	label.Text = "Created By @xLunarxZzRbxx"
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 50
+	label.TextColor3 = Color3.new(1,1,1)
+	label.TextTransparency = 1
+
+	-- Fade in
+	local fadeIn = TweenService:Create(label, TweenInfo.new(0.8), {
+		TextTransparency = 0
+	})
+	fadeIn:Play()
+	fadeIn.Completed:Wait()
+
+	task.wait(2.5)
+
+	-- Fade out
+	local fadeOut = TweenService:Create(label, TweenInfo.new(0.8), {
+		TextTransparency = 1
+	})
+	fadeOut:Play()
+	fadeOut.Completed:Wait()
+
+	gui:Destroy()
+end
+
+showWatermarkAndWait()
+
 task.spawn(function()
-	local chan = TextChatService:WaitForChild("TextChannels"):WaitForChild("RBXGeneral")
-	chan:SendAsync("xLunarxZzRbxx Admin loaded – !cmds for list")
+	local chan = TextChatService
+		:WaitForChild("TextChannels")
+		:WaitForChild("RBXGeneral")
+
+	chan:SendAsync("Admin loaded – !cmds for list – Created By @xLunarxZzRbxx")
 end)
+
