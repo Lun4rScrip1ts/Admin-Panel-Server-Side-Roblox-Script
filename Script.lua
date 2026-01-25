@@ -1289,7 +1289,7 @@ task.spawn(function()
     task.delay(2, function() wm:Destroy() end)
 end)
 --!nocheck
--- Lunar Rainbow Spinning Crosshair (Text ALWAYS under crosshair, independent of length!)
+-- Lunar Rainbow Spinning Crosshair (Text ALWAYS under crosshair, DOES NOT rotate)
 -- LocalScript - StarterPlayer → StarterPlayerScripts
 
 local Players = game:GetService("Players")
@@ -1297,6 +1297,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
+
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
@@ -1304,7 +1305,7 @@ local mouse = player:GetMouse()
 task.wait(0.1)
 UserInputService.MouseIconEnabled = false
 if mouse then mouse.Icon = "" end
-print("🌙 Lunar Crosshair: Mouse hidden | Text always below crosshair")
+print("🌙 Lunar Crosshair: Mouse hidden | Text fixed under crosshair (no rotation)")
 
 -- ================= GUI =================
 local gui = Instance.new("ScreenGui")
@@ -1361,21 +1362,22 @@ crosshairSymbol.ZIndex = 999
 crosshairSymbol.Parent = center
 crosshairSymbol.Visible = false
 
--- ================= TEXT =================
+-- ================= TEXT (always upright, under crosshair) =================
 local text = Instance.new("TextLabel")
 text.Text = settings.Text
 text.Font = Enum.Font.GothamBold
 text.TextSize = 18
 text.BackgroundTransparency = 1
-text.AnchorPoint = Vector2.new(0.5, 0)
+text.AnchorPoint = Vector2.new(0.5, 0) -- top-center
 text.ZIndex = 999
 text.TextStrokeTransparency = 0.5
 text.TextStrokeColor3 = Color3.new(0,0,0)
-text.Parent = gui
+text.TextXAlignment = Enum.TextXAlignment.Center
+text.Parent = gui  -- stays in gui → does NOT rotate
 
 -- ================= SETTINGS PANEL =================
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(240, 540)  -- Made taller for new button
+panel.Size = UDim2.fromOffset(240, 540)
 panel.Position = UDim2.fromOffset(30, 200)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
@@ -1391,7 +1393,7 @@ title.Text = "Lunar Crosshair (Right Shift: Toggle)"
 title.Size = UDim2.new(1,0,0,30)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 10
+title.TextSize = 14
 title.TextColor3 = Color3.new(1,1,1)
 title.ZIndex = 501
 title.Parent = panel
@@ -1405,7 +1407,6 @@ title.InputBegan:Connect(function(input)
         startPos = panel.Position
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
@@ -1415,7 +1416,6 @@ UserInputService.InputChanged:Connect(function(input)
         )
     end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
@@ -1537,7 +1537,7 @@ end
 -- Create inputs
 makeInput("Vert Length", 40, "VertLength", 1, 10000)
 makeInput("Horz Length", 70, "HorzLength", 1, 10000)
-makeInput("Thickness", 100, "Width", 1, 10000)
+makeInput("Width", 100, "Width", 1, 10000)
 makeInput("Rotation", 130, "RotationSpeed", 0, 10000)
 makeInput("Rainbow", 160, "RainbowSpeed", 0, 10000)
 makeInput("Y Offset", 190, "YOffset", -50, 50)
@@ -1573,8 +1573,7 @@ grid.CellSize = UDim2.fromOffset(30, 30)
 grid.CellPadding = UDim2.fromOffset(5, 5)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 
-local symbols = {"+", "-", "×", "÷", "*", "•", "○", "□", "△", "▽", "♡", "♥", "★", "☆", "!", "@", "#", "$", "%", "^", "&", "(", ")", "[", "]", "{", "}", "<", ">", "/", "\\", "|", "~"}
-
+local symbols = {"卐","+","-","×","÷","*","•","○","□","△","▽","♡","♥","★","☆","!","@","#","$","%","^","&","(",")","[","]","{","}","<",">","/","\\","|","~"}
 for _, sym in ipairs(symbols) do
     local btn = Instance.new("TextButton")
     btn.Text = sym
@@ -1591,7 +1590,6 @@ for _, sym in ipairs(symbols) do
         symbolBox.Text = sym
     end)
 end
-
 symbolList.CanvasSize = UDim2.new(0, 0, 0, grid.AbsoluteContentSize.Y)
 
 -- Toggles
@@ -1605,7 +1603,7 @@ discordButton.Position = UDim2.fromOffset(10, 510)
 discordButton.Size = UDim2.fromOffset(220, 30)
 discordButton.Font = Enum.Font.GothamBold
 discordButton.TextSize = 16
-discordButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)  -- Discord blurple
+discordButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
 discordButton.TextColor3 = Color3.new(1,1,1)
 discordButton.BorderSizePixel = 0
 discordButton.ZIndex = 501
@@ -1613,14 +1611,12 @@ discordButton.Parent = panel
 Instance.new("UICorner", discordButton).CornerRadius = UDim.new(0,8)
 
 local discordLink = "https://discord.gg/5GeQAXYYcW"
-
 discordButton.MouseButton1Click:Connect(function()
     if setclipboard then
         setclipboard(discordLink)
     elseif toClipboard then
         toClipboard(discordLink)
     else
-        -- Fallback: try StarterGui method (works in some exploits/executors)
         pcall(function()
             StarterGui:SetCore("SendNotification", {
                 Title = "Discord Link",
@@ -1631,7 +1627,6 @@ discordButton.MouseButton1Click:Connect(function()
         return
     end
 
-    -- Success feedback
     local feedback = Instance.new("TextLabel")
     feedback.Text = "Copied to clipboard!"
     feedback.Size = UDim2.fromOffset(200, 30)
@@ -1697,30 +1692,37 @@ local rotation = 0
 RunService.RenderStepped:Connect(function(dt)
     local mousePos = UserInputService:GetMouseLocation()
     local baseY = mousePos.Y + settings.YOffset
+
     center.Position = UDim2.fromOffset(mousePos.X, baseY)
 
     local crossBottomY
+
     if settings.Symbol ~= "" then
         vertical.Visible = false
         horizontal.Visible = false
         crosshairSymbol.Visible = true
+
         crosshairSymbol.Text = settings.Symbol
         crosshairSymbol.TextColor3 = Color3.fromHSV(hue, 1, 1)
         crosshairSymbol.TextSize = settings.VertLength
+
         crossBottomY = baseY + (settings.VertLength / 2)
     else
         vertical.Visible = true
         horizontal.Visible = true
         crosshairSymbol.Visible = false
+
         vertical.Size = UDim2.fromOffset(settings.Width, settings.VertLength)
         horizontal.Size = UDim2.fromOffset(settings.HorzLength, settings.Width)
+
         crossBottomY = baseY + (settings.VertLength / 2)
     end
 
-    local textY = crossBottomY + settings.TextGap
-    text.Position = UDim2.fromOffset(mousePos.X, textY)
-
+    -- Text always positioned under crosshair center — never rotates
+    text.Position = UDim2.fromOffset(mousePos.X, crossBottomY + settings.TextGap)
     text.Text = settings.Text
+    text.TextColor3 = Color3.fromHSV(hue, 1, 1)
+
     vertical.AnchorPoint = Vector2.new(0.5, 0.5)
     horizontal.AnchorPoint = Vector2.new(0.5, 0.5)
     vertical.Position = UDim2.fromScale(0.5, 0.5)
@@ -1729,6 +1731,8 @@ RunService.RenderStepped:Connect(function(dt)
     if settings.SpinEnabled then
         rotation = rotation + settings.RotationSpeed * dt
         center.Rotation = rotation % 360
+    else
+        center.Rotation = 0
     end
 
     hue = (hue + settings.RainbowSpeed * dt) % 1
@@ -1736,7 +1740,6 @@ RunService.RenderStepped:Connect(function(dt)
 
     vertical.BackgroundColor3 = color
     horizontal.BackgroundColor3 = color
-    text.TextColor3 = color
     title.TextColor3 = color
     panel.BackgroundColor3 = Color3.fromHSV(hue, 0.7, 0.18)
 
