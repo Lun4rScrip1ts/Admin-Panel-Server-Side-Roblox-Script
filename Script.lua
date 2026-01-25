@@ -1292,19 +1292,19 @@ end)
 -- Lunar Rainbow Spinning Crosshair (Text ALWAYS under crosshair, independent of length!)
 -- LocalScript - StarterPlayer → StarterPlayerScripts
 
-local Players        = game:GetService("Players")
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService     = game:GetService("RunService")
-
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 local player = Players.LocalPlayer
-local mouse  = player:GetMouse()
+local mouse = player:GetMouse()
 
 -- Force hide default mouse
 task.wait(0.1)
 UserInputService.MouseIconEnabled = false
 if mouse then mouse.Icon = "" end
-
-print("🌙 Lunar Crosshair: Mouse hidden | Text always below crosshair | Adjust Y Offset if needed!")
+print("🌙 Lunar Crosshair: Mouse hidden | Text always below crosshair")
 
 -- ================= GUI =================
 local gui = Instance.new("ScreenGui")
@@ -1317,13 +1317,17 @@ gui.Parent = player:WaitForChild("PlayerGui")
 
 -- ================= SETTINGS =================
 local settings = {
-    Length        = 16,
-    Width         = 3,
+    VertLength = 16,
+    HorzLength = 16,
+    Width = 3,
     RotationSpeed = 120,
-    RainbowSpeed  = 1.5,
-    YOffset       = 0,       -- Fine-tune vertical position if still slightly off
-    TextGap       = 8,       -- NEW: Space between crosshair bottom and text top
-    Text          = "Lunar"  -- Your name!
+    RainbowSpeed = 1.5,
+    YOffset = 0,
+    TextGap = 8,
+    Text = "Lunar",
+    Symbol = "",
+    SpinEnabled = true,
+    VFXEnabled = false
 }
 
 -- ================= CROSSHAIR =================
@@ -1341,16 +1345,29 @@ local function makeLine()
     return f
 end
 
-local vertical   = makeLine(); vertical.Parent   = center
+local vertical = makeLine(); vertical.Parent = center
 local horizontal = makeLine(); horizontal.Parent = center
 
--- ================= TEXT (always positioned relative to crosshair bottom) =================
+local crosshairSymbol = Instance.new("TextLabel")
+crosshairSymbol.BackgroundTransparency = 1
+crosshairSymbol.Size = UDim2.fromScale(1,1)
+crosshairSymbol.AnchorPoint = Vector2.new(0.5, 0.5)
+crosshairSymbol.Position = UDim2.fromScale(0.5, 0.5)
+crosshairSymbol.TextScaled = false
+crosshairSymbol.Font = Enum.Font.GothamBold
+crosshairSymbol.TextStrokeTransparency = 0.5
+crosshairSymbol.TextStrokeColor3 = Color3.new(0,0,0)
+crosshairSymbol.ZIndex = 999
+crosshairSymbol.Parent = center
+crosshairSymbol.Visible = false
+
+-- ================= TEXT =================
 local text = Instance.new("TextLabel")
 text.Text = settings.Text
 text.Font = Enum.Font.GothamBold
 text.TextSize = 18
 text.BackgroundTransparency = 1
-text.AnchorPoint = Vector2.new(0.5, 0)  -- Top-center aligned
+text.AnchorPoint = Vector2.new(0.5, 0)
 text.ZIndex = 999
 text.TextStrokeTransparency = 0.5
 text.TextStrokeColor3 = Color3.new(0,0,0)
@@ -1358,7 +1375,7 @@ text.Parent = gui
 
 -- ================= SETTINGS PANEL =================
 local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(240, 300)
+panel.Size = UDim2.fromOffset(240, 540)  -- Made taller for new button
 panel.Position = UDim2.fromOffset(30, 200)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
@@ -1370,11 +1387,11 @@ local corner = Instance.new("UICorner", panel)
 corner.CornerRadius = UDim.new(0,10)
 
 local title = Instance.new("TextLabel")
-title.Text = "Lunar Crosshair Settings (Right Shift: Toggle)"
+title.Text = "Lunar Crosshair (Right Shift: Toggle)"
 title.Size = UDim2.new(1,0,0,30)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 14
+title.TextSize = 10
 title.TextColor3 = Color3.new(1,1,1)
 title.ZIndex = 501
 title.Parent = panel
@@ -1431,7 +1448,6 @@ local function makeInput(name, yOffset, key, minVal, maxVal)
     box.BorderSizePixel = 0
     box.ZIndex = 501
     box.Parent = panel
-
     Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
 
     box:GetPropertyChangedSignal("Text"):Connect(function()
@@ -1477,77 +1493,258 @@ local function makeTextInput(name, yOffset, key)
     box.BorderSizePixel = 0
     box.ZIndex = 501
     box.Parent = panel
-
     Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
 
     box:GetPropertyChangedSignal("Text"):Connect(function()
         settings[key] = box.Text
     end)
+
+    return box
+end
+
+local function makeToggle(name, yOffset, key)
+    local label = Instance.new("TextLabel")
+    label.Text = name
+    label.Position = UDim2.fromOffset(10, yOffset)
+    label.Size = UDim2.fromOffset(130, 20)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextColor3 = Color3.new(0.9,0.9,0.9)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 501
+    label.Parent = panel
+
+    local button = Instance.new("TextButton")
+    button.Text = settings[key] and "On" or "Off"
+    button.Position = UDim2.fromOffset(150, yOffset)
+    button.Size = UDim2.fromOffset(75, 20)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 12
+    button.BackgroundColor3 = Color3.fromRGB(35,35,40)
+    button.TextColor3 = Color3.new(1,1,1)
+    button.BorderSizePixel = 0
+    button.ZIndex = 501
+    button.Parent = panel
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0,6)
+
+    button.MouseButton1Click:Connect(function()
+        settings[key] = not settings[key]
+        button.Text = settings[key] and "On" or "Off"
+    end)
 end
 
 -- Create inputs
-makeInput("Length",     40, "Length",        1, 100)
-makeInput("Width",      70, "Width",         1,  50)
-makeInput("Rotation",  100, "RotationSpeed", 0, 500)
-makeInput("Rainbow",   130, "RainbowSpeed",  0,  10)
-makeInput("Y Offset",  160, "YOffset",     -50,  50)
-makeInput("Text Gap",  190, "TextGap",       0,  50)   -- NEW: Control space under crosshair
-makeTextInput("Text",  225, "Text")
+makeInput("Vert Length", 40, "VertLength", 1, 10000)
+makeInput("Horz Length", 70, "HorzLength", 1, 10000)
+makeInput("Thickness", 100, "Width", 1, 10000)
+makeInput("Rotation", 130, "RotationSpeed", 0, 10000)
+makeInput("Rainbow", 160, "RainbowSpeed", 0, 10000)
+makeInput("Y Offset", 190, "YOffset", -50, 50)
+makeInput("Text Gap", 220, "TextGap", 0, 10000)
 
--- Toggle panel
+makeTextInput("Text", 255, "Text")
+local symbolBox = makeTextInput("Symbol", 290, "Symbol")
+
+-- Symbol selection list
+local listLabel = Instance.new("TextLabel")
+listLabel.Text = "Select Symbol:"
+listLabel.Position = UDim2.fromOffset(10, 320)
+listLabel.Size = UDim2.fromOffset(220, 20)
+listLabel.BackgroundTransparency = 1
+listLabel.Font = Enum.Font.Gotham
+listLabel.TextSize = 12
+listLabel.TextColor3 = Color3.new(0.9,0.9,0.9)
+listLabel.TextXAlignment = Enum.TextXAlignment.Left
+listLabel.ZIndex = 501
+listLabel.Parent = panel
+
+local symbolList = Instance.new("ScrollingFrame")
+symbolList.Position = UDim2.fromOffset(10, 340)
+symbolList.Size = UDim2.fromOffset(220, 100)
+symbolList.BackgroundTransparency = 1
+symbolList.CanvasSize = UDim2.new(0, 0, 0, 0)
+symbolList.ScrollBarThickness = 4
+symbolList.ZIndex = 501
+symbolList.Parent = panel
+
+local grid = Instance.new("UIGridLayout", symbolList)
+grid.CellSize = UDim2.fromOffset(30, 30)
+grid.CellPadding = UDim2.fromOffset(5, 5)
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+
+local symbols = {"+", "-", "×", "÷", "*", "•", "○", "□", "△", "▽", "♡", "♥", "★", "☆", "!", "@", "#", "$", "%", "^", "&", "(", ")", "[", "]", "{", "}", "<", ">", "/", "\\", "|", "~"}
+
+for _, sym in ipairs(symbols) do
+    local btn = Instance.new("TextButton")
+    btn.Text = sym
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 20
+    btn.BackgroundColor3 = Color3.fromRGB(35,35,40)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.BorderSizePixel = 0
+    btn.ZIndex = 501
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+    btn.Parent = symbolList
+    btn.MouseButton1Click:Connect(function()
+        settings.Symbol = sym
+        symbolBox.Text = sym
+    end)
+end
+
+symbolList.CanvasSize = UDim2.new(0, 0, 0, grid.AbsoluteContentSize.Y)
+
+-- Toggles
+makeToggle("Spin", 450, "SpinEnabled")
+makeToggle("VFX", 480, "VFXEnabled")
+
+-- ================= DISCORD BUTTON =================
+local discordButton = Instance.new("TextButton")
+discordButton.Text = "Join Discord!"
+discordButton.Position = UDim2.fromOffset(10, 510)
+discordButton.Size = UDim2.fromOffset(220, 30)
+discordButton.Font = Enum.Font.GothamBold
+discordButton.TextSize = 16
+discordButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)  -- Discord blurple
+discordButton.TextColor3 = Color3.new(1,1,1)
+discordButton.BorderSizePixel = 0
+discordButton.ZIndex = 501
+discordButton.Parent = panel
+Instance.new("UICorner", discordButton).CornerRadius = UDim.new(0,8)
+
+local discordLink = "https://discord.gg/5GeQAXYYcW"
+
+discordButton.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard(discordLink)
+    elseif toClipboard then
+        toClipboard(discordLink)
+    else
+        -- Fallback: try StarterGui method (works in some exploits/executors)
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "Discord Link",
+                Text = discordLink .. "\n(Copied manually or use setclipboard)",
+                Duration = 8
+            })
+        end)
+        return
+    end
+
+    -- Success feedback
+    local feedback = Instance.new("TextLabel")
+    feedback.Text = "Copied to clipboard!"
+    feedback.Size = UDim2.fromOffset(200, 30)
+    feedback.Position = UDim2.fromOffset(20, 545)
+    feedback.BackgroundTransparency = 0.3
+    feedback.BackgroundColor3 = Color3.fromRGB(0,170,0)
+    feedback.TextColor3 = Color3.new(1,1,1)
+    feedback.Font = Enum.Font.Gotham
+    feedback.TextSize = 14
+    feedback.ZIndex = 502
+    feedback.Parent = panel
+    Instance.new("UICorner", feedback).CornerRadius = UDim.new(0,6)
+
+    task.delay(2.5, function()
+        feedback:Destroy()
+    end)
+end)
+
+-- ================= TOGGLE PANEL =================
 UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.RightShift then
         panel.Visible = not panel.Visible
     end
 end)
 
+-- ================= PARTICLE SPAWN =================
+local function spawnParticle(color)
+    local p = Instance.new("Frame")
+    p.Size = UDim2.fromOffset(settings.Width * 2, settings.Width * 2)
+    p.BackgroundColor3 = color
+    p.BackgroundTransparency = 0
+    p.AnchorPoint = Vector2.new(0.5, 0.5)
+    p.Position = UDim2.fromOffset(0, 0)
+    p.BorderSizePixel = 0
+    p.ZIndex = 998
+    p.Parent = center
+
+    local corner = Instance.new("UICorner", p)
+    corner.CornerRadius = UDim.new(1, 0)
+
+    local direction = math.random() * math.pi * 2
+    local distance = 50 + math.random() * 100
+    local life = 0.3 + math.random() * 0.4
+
+    local goal = {
+        Position = UDim2.fromOffset(math.cos(direction) * distance, math.sin(direction) * distance),
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(settings.Width * 3, settings.Width * 3)
+    }
+
+    local tweenInfo = TweenInfo.new(life, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(p, tweenInfo, goal)
+    tween:Play()
+    tween.Completed:Connect(function()
+        p:Destroy()
+    end)
+end
+
 -- ================= MAIN LOOP =================
 local hue = 0
 local rotation = 0
 
 RunService.RenderStepped:Connect(function(dt)
-    -- Mouse position (most reliable combo)
     local mousePos = UserInputService:GetMouseLocation()
-
     local baseY = mousePos.Y + settings.YOffset
-
-    -- Center the crosshair perfectly
     center.Position = UDim2.fromOffset(mousePos.X, baseY)
 
-    -- Text ALWAYS positioned BELOW the bottom of the vertical line
-    -- Bottom of vertical = center Y + half length (since anchored at 0.5)
-    local crossBottomY = baseY + (settings.Length / 2)
-    local textY = crossBottomY + settings.TextGap
+    local crossBottomY
+    if settings.Symbol ~= "" then
+        vertical.Visible = false
+        horizontal.Visible = false
+        crosshairSymbol.Visible = true
+        crosshairSymbol.Text = settings.Symbol
+        crosshairSymbol.TextColor3 = Color3.fromHSV(hue, 1, 1)
+        crosshairSymbol.TextSize = settings.VertLength
+        crossBottomY = baseY + (settings.VertLength / 2)
+    else
+        vertical.Visible = true
+        horizontal.Visible = true
+        crosshairSymbol.Visible = false
+        vertical.Size = UDim2.fromOffset(settings.Width, settings.VertLength)
+        horizontal.Size = UDim2.fromOffset(settings.HorzLength, settings.Width)
+        crossBottomY = baseY + (settings.VertLength / 2)
+    end
 
+    local textY = crossBottomY + settings.TextGap
     text.Position = UDim2.fromOffset(mousePos.X, textY)
 
-    -- Live updates
-    vertical.Size   = UDim2.fromOffset(settings.Width, settings.Length)
-    horizontal.Size = UDim2.fromOffset(settings.Length, settings.Width)
-    text.Text       = settings.Text
-
-    vertical.AnchorPoint   = Vector2.new(0.5, 0.5)
+    text.Text = settings.Text
+    vertical.AnchorPoint = Vector2.new(0.5, 0.5)
     horizontal.AnchorPoint = Vector2.new(0.5, 0.5)
-    vertical.Position   = UDim2.fromScale(0.5, 0.5)
+    vertical.Position = UDim2.fromScale(0.5, 0.5)
     horizontal.Position = UDim2.fromScale(0.5, 0.5)
 
-    -- Rotation & rainbow
-    rotation += settings.RotationSpeed * dt
-    center.Rotation = rotation % 360
+    if settings.SpinEnabled then
+        rotation = rotation + settings.RotationSpeed * dt
+        center.Rotation = rotation % 360
+    end
 
     hue = (hue + settings.RainbowSpeed * dt) % 1
     local color = Color3.fromHSV(hue, 1, 1)
 
-    vertical.BackgroundColor3   = color
+    vertical.BackgroundColor3 = color
     horizontal.BackgroundColor3 = color
-    text.TextColor3             = color
-    title.TextColor3            = color
-    panel.BackgroundColor3      = Color3.fromHSV(hue, 0.7, 0.18)
+    text.TextColor3 = color
+    title.TextColor3 = color
+    panel.BackgroundColor3 = Color3.fromHSV(hue, 0.7, 0.18)
+
+    if settings.VFXEnabled and math.random() < 0.3 then
+        spawnParticle(color)
+    end
 end)
-
-print("🌙 Loaded! Text now stays under crosshair even when changing length. Use 'Text Gap' to adjust spacing.")
-
 local TextChatService = game:GetService "TextChatService"
 local TextChannel = TextChatService:WaitForChild "TextChannels" : WaitForChild "RBXGeneral" :: TextChannel
 --parenthesis are optional in calls with one literal argument
-TextChannel:SendAsync "Created by Lunar Studios"
+TextChannel:SendAsync "🌙Created by Lunar Studios🌙"
