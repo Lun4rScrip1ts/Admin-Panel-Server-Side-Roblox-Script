@@ -1060,6 +1060,13 @@ local freecamData = {
     rotation = Vector2.new(0, 0)
 }
 
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+
+local function isTyping()
+    return UIS:GetFocusedTextBox() ~= nil
+end
+
 local function enableFreecam()
     if freecamData.enabled then return end
     freecamData.enabled = true
@@ -1067,96 +1074,85 @@ local function enableFreecam()
     local cam = workspace.CurrentCamera
     freecamData.camera = cam
     
-    local originalType = cam.CameraType
-    local originalCFrame = cam.CFrame
-    
     cam.CameraType = Enum.CameraType.Scriptable
+
+    -- lock mouse
+    UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+    UIS.MouseIconEnabled = false
     
-    if hrp then
-        cam.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 5, 10), hrp.Position)
-    end
-    
-    local speed = 50
+    local speed = 60
+    local sensitivity = 0.15
+    local smoothing = 12
+
     local keys = {}
-    local mouseDelta = Vector2.new(0, 0)
+    local targetPos = cam.CFrame.Position
+    local currentPos = targetPos
+    local targetRot = freecamData.rotation
+    local currentRot = targetRot
     
-    freecamData.inputBeganConn = UserInputService.InputBegan:Connect(function(input)
+    -- INPUT
+    freecamData.inputBeganConn = UIS.InputBegan:Connect(function(input, gpe)
+        if gpe or isTyping() then return end
         if input.UserInputType == Enum.UserInputType.Keyboard then
             keys[input.KeyCode] = true
         end
     end)
     
-    freecamData.inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+    freecamData.inputEndedConn = UIS.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Keyboard then
             keys[input.KeyCode] = false
         end
     end)
     
-    freecamData.mouseConn = UserInputService.InputChanged:Connect(function(input)
+    -- MOUSE LOOK
+    freecamData.mouseConn = UIS.InputChanged:Connect(function(input, gpe)
+        if gpe or isTyping() then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseMovement then
-            mouseDelta = input.Delta
+            local delta = input.Delta
+            targetRot = targetRot + Vector2.new(-delta.X, -delta.Y) * sensitivity
+            targetRot = Vector2.new(targetRot.X, math.clamp(targetRot.Y, -85, 85))
         end
     end)
     
-    freecamData.connection = RunService.RenderStepped:Connect(function(dt)
-        if mouseDelta.Magnitude > 0 then
-            local sensitivity = 0.3
-            freecamData.rotation = freecamData.rotation + Vector2.new(mouseDelta.X, mouseDelta.Y) * sensitivity
-            mouseDelta = Vector2.new(0, 0)
+    -- MAIN LOOP
+    freecamData.connection = RS.RenderStepped:Connect(function(dt)
+
+        -- smooth rotation
+        currentRot = currentRot:Lerp(targetRot, math.clamp(dt * smoothing,0,1))
+        
+        local rotCF =
+            CFrame.Angles(0, math.rad(currentRot.X), 0) *
+            CFrame.Angles(math.rad(currentRot.Y), 0, 0)
+
+        -- movement disabled while typing
+        local moveDir = Vector3.zero
+        if not isTyping() then
+            moveDir = Vector3.new(
+                (keys[Enum.KeyCode.D] and 1 or 0) - (keys[Enum.KeyCode.A] and 1 or 0),
+                (keys[Enum.KeyCode.E] and 1 or 0) - (keys[Enum.KeyCode.Q] and 1 or 0),
+                (keys[Enum.KeyCode.S] and 1 or 0) - (keys[Enum.KeyCode.W] and 1 or 0)
+            )
         end
         
-        freecamData.rotation = Vector2.new(
-            freecamData.rotation.X % 360,
-            math.clamp(freecamData.rotation.Y, -80, 80)
-        )
-        
-        local rotCF = CFrame.Angles(0, math.rad(-freecamData.rotation.X), 0) * 
-                      CFrame.Angles(math.rad(-freecamData.rotation.Y), 0, 0)
-        
-        local moveDir = Vector3.new(
-            (keys[Enum.KeyCode.D] and 1 or 0) - (keys[Enum.KeyCode.A] and 1 or 0),
-            (keys[Enum.KeyCode.E] and 1 or 0) - (keys[Enum.KeyCode.Q] and 1 or 0),
-            (keys[Enum.KeyCode.S] and 1 or 0) - (keys[Enum.KeyCode.W] and 1 or 0)
-        )
-        
-        local currentPos = cam.CFrame.Position
         if moveDir.Magnitude > 0 then
-            local moveCF = CFrame.new(currentPos) * rotCF
-            local worldDir = (moveCF.LookVector * -moveDir.Z) + 
-                           (moveCF.RightVector * moveDir.X) + 
-                           (Vector3.new(0, 1, 0) * moveDir.Y)
-            currentPos = currentPos + worldDir.Unit * speed * dt
+            moveDir = moveDir.Unit
+            
+            local moveVector =
+                (rotCF.LookVector * -moveDir.Z) +
+                (rotCF.RightVector * moveDir.X) +
+                (Vector3.yAxis * moveDir.Y)
+            
+            targetPos += moveVector * speed * dt
         end
+        
+        -- smooth movement
+        currentPos = currentPos:Lerp(targetPos, math.clamp(dt * smoothing,0,1))
         
         cam.CFrame = CFrame.new(currentPos) * rotCF
     end)
-    
-    notify("✅ Freecam enabled (Mouse to look, WASD to move, Q/E up/down)", Color3.fromRGB(100, 200, 255))
-end
 
-local function disableFreecam()
-    if not freecamData.enabled then return end
-    freecamData.enabled = false
-    
-    if freecamData.connection then
-        freecamData.connection:Disconnect()
-        freecamData.connection = nil
-    end
-    if freecamData.inputBeganConn then
-        freecamData.inputBeganConn:Disconnect()
-        freecamData.inputBeganConn = nil
-    end
-    if freecamData.inputEndedConn then
-        freecamData.inputEndedConn:Disconnect()
-        freecamData.inputEndedConn = nil
-    end
-    if freecamData.mouseConn then
-        freecamData.mouseConn:Disconnect()
-        freecamData.mouseConn = nil
-    end
-    
-    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-    notify("✅ Freecam disabled", Color3.fromRGB(255, 160, 60))
+    notify("✅ Freecam enabled", Color3.fromRGB(100,200,255))
 end
 
 -- =============================================================
