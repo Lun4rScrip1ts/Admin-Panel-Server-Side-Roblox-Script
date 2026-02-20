@@ -1167,14 +1167,6 @@ local RunService = game:GetService("RunService")
 
 local spinData = {}
 
-local function getRootJoint(char)
-	for _,v in pairs(char:GetDescendants()) do
-		if v:IsA("Motor6D") and v.Name == "RootJoint" then
-			return v
-		end
-	end
-end
-
 function spin(plr, speed)
 
 	speed = tonumber(speed) or 20
@@ -1187,50 +1179,40 @@ function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	unspin(plr)
+	-- Stop old spin properly
+	if spinData[plr] then
+		unspin(plr)
+	end
 
-	-- stop humanoid rotation
 	hum.AutoRotate = false
-	hum:ChangeState(Enum.HumanoidStateType.Physics)
 
 	pcall(function()
 		hrp:SetNetworkOwner(nil)
 	end)
 
-	-- LOCK the humanoid motor rotation
-	local rootJoint = getRootJoint(char)
-	local savedC0
-	if rootJoint then
-		savedC0 = rootJoint.C0
-		rootJoint.C0 = CFrame.new(0,0,0)
-	end
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = hrp
 
-	local session = tick()
-	local angle = 0
+	local align = Instance.new("AlignOrientation")
+	align.Attachment0 = attachment
+	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	align.RigidityEnabled = true
+	align.Responsiveness = 200
+	align.MaxTorque = math.huge
+	align.Parent = hrp
 
 	spinData[plr] = {
-		id = session,
-		joint = rootJoint,
-		oldC0 = savedC0
+		align = align,
+		attachment = attachment,
+		speed = speed
 	}
 
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
-
 		local data = spinData[plr]
-		if not data or data.id ~= session then return end
-		if not plr.Character or plr.Character ~= char then
-			unspin(plr)
-			return
-		end
+		if not data then return end
 
-		local pos = hrp.Position
-
-		-- NOW speed is truly unlimited
-		angle += speed * dt * 60
-
-		hrp.CFrame =
-			CFrame.new(pos) *
-			CFrame.Angles(0, math.rad(angle), 0)
+		-- rotate ONE direction continuously
+		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(data.speed) * dt * 60, 0)
 	end)
 end
 
@@ -1244,18 +1226,15 @@ function unspin(plr)
 		data.connection:Disconnect()
 	end
 
+	if data.align then data.align:Destroy() end
+	if data.attachment then data.attachment:Destroy() end
+
 	local char = plr.Character
 	if char then
 		local hum = char:FindFirstChildOfClass("Humanoid")
 		if hum then
 			hum.AutoRotate = true
-			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
-	end
-
-	-- restore root joint
-	if data.joint and data.oldC0 then
-		data.joint.C0 = data.oldC0
 	end
 
 	spinData[plr] = nil
