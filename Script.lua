@@ -1172,13 +1172,11 @@ local function spin(plr, speed)
 		return
 	end
 	
-	if spinData[plr] then
-		unspin(plr)
-	end
+	if spinData[plr] then return end
 	
 	speed = tonumber(speed) or 20
 	speed = math.clamp(speed, 1, 10000)
-	
+
 	local char = plr.Character
 	if not char then return end
 	
@@ -1186,28 +1184,24 @@ local function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 	
-	-- Stop Roblox from fighting rotation
 	hum.AutoRotate = false
 	
 	local rotation = 0
 	
 	spinData[plr] = {}
 	
-	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
+	spinData[plr].connection = RunService.RenderStepped:Connect(function(dt)
 		if not hrp or not hrp.Parent then return end
 		
 		rotation += speed * dt
 		
+		-- If seated, spin the whole seat assembly
 		if hum.SeatPart then
-			-- If seated, rotate seat assembly instead
 			local seat = hum.SeatPart
 			if seat and seat:IsA("BasePart") then
 				local model = seat:FindFirstAncestorOfClass("Model")
-				
 				if model and model.PrimaryPart then
-					local currentCF = model.PrimaryPart.CFrame
-					local pos = currentCF.Position
-					
+					local pos = model.PrimaryPart.Position
 					model:SetPrimaryPartCFrame(
 						CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
 					)
@@ -1217,23 +1211,27 @@ local function spin(plr, speed)
 				end
 			end
 		else
-			-- Normal character spin
+			-- Normal walking / standing spin
 			local pos = hrp.Position
 			hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
 		end
 	end)
 	
-	notify("🌀 Spinning at speed "..speed, currentTheme.accent)
+	notify("🌀 Spinning at speed " .. speed, currentTheme.accent)
 end
 
 
 local function unspin(plr)
-	if not spinData[plr] then return end
+	if plr ~= client then
+		notify("❌ Unspin only works on yourself", Color3.fromRGB(255,100,100))
+		return
+	end
 	
 	local data = spinData[plr]
+	if not data then return end
 	
 	if data.connection then
-		data.connection:Disco nnect()
+		data.connection:Disconnect()
 	end
 	
 	local char = plr.Character
