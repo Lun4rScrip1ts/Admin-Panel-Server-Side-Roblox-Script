@@ -1179,14 +1179,18 @@ function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- Stop old spin
+	-- stop previous spin
 	if spinData[plr] then
 		unspin(plr)
 	end
 
+	-- disable normal rotation
 	hum.AutoRotate = false
 
-	-- server owns physics (prevents fling)
+	-- THIS is the important fix
+	hum:ChangeState(Enum.HumanoidStateType.Physics)
+
+	-- server owns movement
 	pcall(function()
 		hrp:SetNetworkOwner(nil)
 	end)
@@ -1194,6 +1198,7 @@ function spin(plr, speed)
 	local angle = 0
 
 	spinData[plr] = {}
+
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
 
 		if not plr.Character or plr.Character ~= char then
@@ -1201,13 +1206,11 @@ function spin(plr, speed)
 			return
 		end
 
-		-- keep same position
 		local pos = hrp.Position
 
-		-- accumulate rotation
+		-- true unlimited spin speed
 		angle += speed * dt * 60
 
-		-- rotate character (NO physics forces)
 		hrp.CFrame =
 			CFrame.new(pos) *
 			CFrame.Angles(0, math.rad(angle), 0)
@@ -1229,6 +1232,9 @@ function unspin(plr)
 		local hum = char:FindFirstChildOfClass("Humanoid")
 		if hum then
 			hum.AutoRotate = true
+
+			-- restore humanoid control
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
 	end
 
@@ -1241,7 +1247,6 @@ Players.PlayerAdded:Connect(function(plr)
 		unspin(plr)
 	end)
 end)
-
 -- =============================================================
 -- LEAVE COMMAND
 -- =============================================================
