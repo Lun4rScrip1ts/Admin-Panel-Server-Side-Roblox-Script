@@ -1163,101 +1163,99 @@ end
 -- SPIN SYSTEM
 -- =============================================================
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
--- stores who is spinning
 local spinning = {}
 
 local function getRoot(character)
-    return character:FindFirstChild("HumanoidRootPart")
+return character:FindFirstChild("HumanoidRootPart")
 end
 
 local function stopSpin(player)
-    local data = spinning[player]
-    if not data then return end
+local data = spinning[player]
+if not data then return end
 
-    local char = player.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.AutoRotate = true
-    end
+```
+if data.connection then
+    data.connection:Disconnect()
+end
 
-    if data.align then data.align:Destroy() end
-    if data.attach then data.attach:Destroy() end
+local char = player.Character
+if char and char:FindFirstChild("Humanoid") then
+    char.Humanoid.AutoRotate = true
+end
 
-    spinning[player] = nil
+spinning[player] = nil
+```
+
 end
 
 local function startSpin(player, speed)
-    local char = player.Character
-    if not char then return end
+local char = player.Character
+if not char then return end
 
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local root = getRoot(char)
-    if not humanoid or not root then return end
+```
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+local root = getRoot(char)
+if not humanoid or not root then return end
 
-    -- stop old spin
-    stopSpin(player)
+stopSpin(player)
 
-    -- VERY IMPORTANT
-    humanoid.AutoRotate = false
-    root.AssemblyAngularVelocity = Vector3.zero
-    root.AssemblyLinearVelocity = Vector3.zero
+-- disable roblox rotation fighting
+humanoid.AutoRotate = false
 
-    -- lock network ownership so physics is stable
-    root:SetNetworkOwner(nil)
+-- server owns physics (prevents fling)
+root:SetNetworkOwner(nil)
 
-    -- attachment
-    local attach = Instance.new("Attachment")
-    attach.Name = "SpinAttachment"
-    attach.Parent = root
+-- make sure not moving already
+root.AssemblyAngularVelocity = Vector3.zero
 
-    -- AlignOrientation is the secret (NOT BodyGyro)
-    local align = Instance.new("AlignOrientation")
-    align.Name = "SpinAlign"
-    align.Attachment0 = attach
-    align.RigidityEnabled = true
-    align.Responsiveness = 200
-    align.MaxTorque = math.huge
-    align.Parent = root
+local angle = 0
 
-    -- store
-    spinning[player] = {
-        align = align,
-        attach = attach,
-        speed = speed
-    }
+spinning[player] = {}
 
-    -- clean one-direction spin
-    task.spawn(function()
-        local angle = 0
+spinning[player].connection = RunService.Heartbeat:Connect(function(dt)
+    if not player.Character or player.Character ~= char then
+        stopSpin(player)
+        return
+    end
 
-        while spinning[player] and player.Character == char do
-            angle += speed * 0.05
-            align.CFrame = CFrame.Angles(0, math.rad(angle), 0)
-            task.wait(0.05)
-        end
-    end)
+    -- calculate rotation
+    angle += speed * dt * 60
+
+    local pos = root.Position
+
+    -- rotate character but KEEP same position
+    root.CFrame =
+        CFrame.new(pos) *
+        CFrame.Angles(0, math.rad(angle), 0)
+end)
+```
+
 end
 
--- CHAT COMMANDS
 Players.PlayerAdded:Connect(function(player)
 
-    player.Chatted:Connect(function(msg)
-        local args = string.split(msg," ")
+```
+player.Chatted:Connect(function(msg)
+    local args = string.split(msg," ")
 
-        if args[1] == "!spin" then
-            local speed = tonumber(args[2]) or 30
-            startSpin(player, speed)
+    if args[1] == "!spin" then
+        local speed = tonumber(args[2]) or 20
+        startSpin(player, speed)
 
-        elseif args[1] == "!unspin" then
-            stopSpin(player)
-        end
-    end)
-
-    -- reset on respawn
-    player.CharacterAdded:Connect(function()
+    elseif args[1] == "!unspin" then
         stopSpin(player)
-    end)
+    end
 end)
+
+player.CharacterAdded:Connect(function()
+    stopSpin(player)
+end)
+```
+
+end)
+
 -- =============================================================
 -- LEAVE COMMAND
 -- =============================================================
