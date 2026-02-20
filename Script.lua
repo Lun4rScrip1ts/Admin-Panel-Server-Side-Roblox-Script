@@ -1162,96 +1162,67 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local spinData = {}
 
-local function getRootJoint(character)
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-    
-    -- R15
-    local root = hrp:FindFirstChild("RootJoint")
-    if root then return root end
-    
-    -- R6 fallback
-    local torso = character:FindFirstChild("Torso")
-    if torso then
-        for _,v in pairs(torso:GetChildren()) do
-            if v:IsA("Motor6D") and v.Name == "RootJoint" then
-                return v
-            end
-        end
-    end
-    
-    return nil
+local function getCharacterParts(plr)
+	local char = plr.Character
+	if not char then return end
+	
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	
+	if not hrp or not hum then return end
+	return char, hrp, hum
 end
 
 
-local function spin(plr, speed)
-    if plr ~= client then
-        notify("❌ Spin only works on yourself", Color3.fromRGB(255,100,100))
-        return
-    end
-    
-    if spinData[plr] then
-        unspin(plr)
-    end
-    
-    speed = tonumber(speed) or 20
-    speed = math.clamp(speed, 1, 10000)
-    
-    local char = plr.Character
-    if not char then return end
-    
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    
-    local rootJoint = getRootJoint(char)
-    if not rootJoint then
-        notify("❌ Could not find RootJoint", Color3.fromRGB(255,100,100))
-        return
-    end
-    
-    hum.AutoRotate = false
-    
-    local rotation = 0
-    local originalC0 = rootJoint.C0
-    
-    spinData[plr] = {}
-    
-    spinData[plr].connection = RunService.RenderStepped:Connect(function(dt)
-        if not rootJoint.Parent then return end
-        
-        rotation += speed * dt
-        
-        rootJoint.C0 = originalC0 * CFrame.Angles(0, rotation, 0)
-    end)
-    
-    notify("🌀 Spinning at "..speed, currentTheme.accent)
+function spin(plr, speed)
+	speed = tonumber(speed) or 20
+	speed = math.clamp(speed, 1, 10000)
+	
+	local char, hrp, hum = getCharacterParts(plr)
+	if not char then return end
+	
+	-- stop previous spin
+	if spinData[plr] then
+		spinData[plr]:Disconnect()
+	end
+	
+	hum.AutoRotate = false
+	hum:ChangeState(Enum.HumanoidStateType.Running)
+	
+	local angle = 0
+	
+	spinData[plr] = RunService.Heartbeat:Connect(function(dt)
+		if not plr.Character or not plr.Character.Parent then return end
+		if not hrp.Parent then return end
+		
+		-- rotate character WITHOUT physics
+		angle += speed * dt
+		
+		local pos = hrp.Position
+		hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
+	end)
 end
 
 
-local function unspin(plr)
-    if not spinData[plr] then return end
-    
-    local char = plr.Character
-    if char then
-        local rootJoint = getRootJoint(char)
-        if rootJoint then
-            rootJoint.C0 = CFrame.new(rootJoint.C0.Position)
-        end
-        
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.AutoRotate = true
-        end
-    end
-    
-    spinData[plr].connection:Disconnect()
-    spinData[plr] = nil
-    
-    notify("✅ Spin stopped", Color3.fromRGB(200,200,200))
+function unspin(plr)
+	local connection = spinData[plr]
+	if connection then
+		connection:Disconnect()
+		spinData[plr] = nil
+	end
+	
+	local char = plr.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
+		end
+	end
 end
 
 -- =============================================================
