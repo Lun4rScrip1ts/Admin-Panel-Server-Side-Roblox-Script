@@ -1163,59 +1163,75 @@ end
 -- SPIN SYSTEM
 -- =============================================================
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local spinData = {}
 
-local function getCharacterParts(plr)
-	local char = plr.Character
-	if not char then return end
-	
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	
-	if not hrp or not hum then return end
-	return char, hrp, hum
-end
-
-
+-- START SPIN
 function spin(plr, speed)
+
 	speed = tonumber(speed) or 20
 	speed = math.clamp(speed, 1, 10000)
-	
-	local char, hrp, hum = getCharacterParts(plr)
+
+	local char = plr.Character
 	if not char then return end
-	
-	-- stop previous spin
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hrp or not hum then return end
+
+	-- stop old spin
 	if spinData[plr] then
-		spinData[plr]:Disconnect()
+		unspin(plr)
 	end
-	
+
+	-- stop humanoid from fighting rotation
 	hum.AutoRotate = false
-	hum:ChangeState(Enum.HumanoidStateType.Running)
-	
-	local angle = 0
-	
-	spinData[plr] = RunService.Heartbeat:Connect(function(dt)
-		if not plr.Character or not plr.Character.Parent then return end
-		if not hrp.Parent then return end
-		
-		-- rotate character WITHOUT physics
-		angle += speed * dt
-		
-		local pos = hrp.Position
-		hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, angle, 0)
+
+	-- make server own physics (VERY IMPORTANT)
+	pcall(function()
+		hrp:SetNetworkOwner(nil)
 	end)
+
+	-- attachment
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SpinAttachment"
+	attachment.Parent = hrp
+
+	-- angular velocity (this is what actually spins)
+	local angular = Instance.new("AngularVelocity")
+	angular.Name = "SpinAngular"
+	angular.Attachment0 = attachment
+	angular.RelativeTo = Enum.ActuatorRelativeTo.World
+
+	-- torque scaled so high speeds work but no fling
+	angular.MaxTorque = 40000 + (speed * 200)
+
+	-- spin speed
+	angular.AngularVelocity = Vector3.new(0, speed, 0)
+
+	angular.Parent = hrp
+
+	spinData[plr] = {
+		attachment = attachment,
+		angular = angular
+	}
 end
 
 
+-- STOP SPIN
 function unspin(plr)
-	local connection = spinData[plr]
-	if connection then
-		connection:Disconnect()
-		spinData[plr] = nil
+
+	local data = spinData[plr]
+	if not data then return end
+
+	if data.angular then
+		data.angular:Destroy()
 	end
-	
+
+	if data.attachment then
+		data.attachment:Destroy()
+	end
+
 	local char = plr.Character
 	if char then
 		local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1223,7 +1239,17 @@ function unspin(plr)
 			hum.AutoRotate = true
 		end
 	end
+
+	spinData[plr] = nil
 end
+
+
+-- OPTIONAL: clean up on respawn so players don't break
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		unspin(plr)
+	end)
+end)
 
 -- =============================================================
 -- LEAVE COMMAND
