@@ -1162,91 +1162,71 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
-local RunService = game:GetService("RunService")
-
 local spinData = {}
 
 local function spin(plr, speed)
-	if plr ~= client then
-		notify("❌ Spin only works on yourself", Color3.fromRGB(255,100,100))
-		return
-	end
-	
-	if spinData[plr] then
-		unspin(plr)
-	end
-	
-	speed = tonumber(speed) or 20
-	speed = math.clamp(speed, 1, 10000)
-	
-	local char = plr.Character
-	if not char then return end
-	
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hrp or not hum then return end
-	
-	-- Stop Roblox from fighting rotation
-	hum.AutoRotate = false
-	
-	local rotation = 0
-	
-	spinData[plr] = {}
-	
-	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
-		if not hrp or not hrp.Parent then return end
-		
-		rotation += speed * dt
-		
-		if hum.SeatPart then
-			-- If seated, rotate seat assembly instead
-			local seat = hum.SeatPart
-			if seat and seat:IsA("BasePart") then
-				local model = seat:FindFirstAncestorOfClass("Model")
-				
-				if model and model.PrimaryPart then
-					local currentCF = model.PrimaryPart.CFrame
-					local pos = currentCF.Position
-					
-					model:SetPrimaryPartCFrame(
-						CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-					)
-				else
-					local pos = seat.Position
-					seat.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-				end
-			end
-		else
-			-- Normal character spin
-			local pos = hrp.Position
-			hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-		end
-	end)
-	
-	notify("🌀 Spinning at speed "..speed, currentTheme.accent)
+    if plr ~= client then
+        notify("❌ Spin only works on yourself", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    local hrp = getHRP(plr)
+    if not hrp or spinData[plr] then return end
+    
+    speed = tonumber(speed) or 20
+    
+    local attachment = Instance.new("Attachment")
+    attachment.Parent = hrp
+    
+    local angularVel = Instance.new("AngularVelocity")
+    angularVel.Attachment0 = attachment
+    angularVel.MaxTorque = math.huge
+    angularVel.AngularVelocity = Vector3.new(0, speed, 0)
+    angularVel.Parent = hrp
+    
+    local bodyPos = Instance.new("BodyPosition")
+    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyPos.Position = hrp.Position
+    bodyPos.Parent = hrp
+    
+    spinData[plr] = {
+        angularVel = angularVel,
+        attachment = attachment,
+        bodyPos = bodyPos,
+        connection = nil
+    }
+    
+    spinData[plr].connection = RunService.Heartbeat:Connect(function()
+        if bodyPos and hrp then
+            bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
+        end
+    end)
+    
+    notify("🌀 Spinning at " .. speed .. " speed", currentTheme.accent)
 end
 
-
 local function unspin(plr)
-	if not spinData[plr] then return end
-	
-	local data = spinData[plr]
-	
-	if data.connection then
-		data.connection:Disconnect()
-	end
-	
-	local char = plr.Character
-	if char then
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum.AutoRotate = true
-		end
-	end
-	
-	spinData[plr] = nil
-	
-	notify("✅ Spin stopped", Color3.fromRGB(200,200,200))
+    if plr ~= client then
+        notify("❌ Unspin only works on yourself", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    if not spinData[plr] then return end
+    
+    local data = spinData[plr]
+    if data.connection then
+        data.connection:Disconnect()
+    end
+    if data.angularVel then
+        data.angularVel:Destroy()
+    end
+    if data.attachment then
+        data.attachment:Destroy()
+    end
+    if data.bodyPos then
+        data.bodyPos:Destroy()
+    end
+    
+    spinData[plr] = nil
+    notify("✅ Spin stopped", Color3.fromRGB(200, 200, 200))
 end
 
 -- =============================================================
