@@ -1179,7 +1179,7 @@ function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- Stop old spin properly
+	-- Stop old spin
 	if spinData[plr] then
 		unspin(plr)
 	end
@@ -1199,20 +1199,30 @@ function spin(plr, speed)
 	align.RigidityEnabled = true
 	align.Responsiveness = 200
 	align.MaxTorque = math.huge
+
+	-- LOCK rotation axis (prevents laying down)
+	align.PrimaryAxisOnly = true
+	align.PrimaryAxis = Vector3.new(0,1,0)
+
 	align.Parent = hrp
 
 	spinData[plr] = {
 		align = align,
 		attachment = attachment,
-		speed = speed
+		angle = 0,
+		connection = nil
 	}
 
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
-		local data = spinData[plr]
-		if not data then return end
+		if spinData[plr] then
+			local data = spinData[plr]
 
-		-- rotate ONE direction continuously
-		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(data.speed) * dt * 60, 0)
+			-- ALWAYS increase (one direction only)
+			data.angle = data.angle + (math.abs(speed) * dt)
+
+			-- keep upright + rotate Y only
+			align.CFrame = CFrame.Angles(0, data.angle, 0)
+		end
 	end)
 end
 
