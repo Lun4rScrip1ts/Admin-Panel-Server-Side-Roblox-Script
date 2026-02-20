@@ -1165,89 +1165,90 @@ end
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
--- store active spins
-local activeSpins = {}
+local spinData = {}
 
-local function stopSpin(player)
-	if not activeSpins[player] then return end
-	
-	local data = activeSpins[player]
+function spin(plr, speed)
+
+	speed = tonumber(speed) or 20
+	speed = math.clamp(speed, 1, 10000)
+
+	local char = plr.Character
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hrp or not hum then return end
+
+	-- Stop old spin
+	if spinData[plr] then
+		unspin(plr)
+	end
+
+	hum.AutoRotate = false
+
+	-- Server owns physics
+	pcall(function()
+		hrp:SetNetworkOwner(nil)
+	end)
+
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = hrp
+
+	local align = Instance.new("AlignOrientation")
+	align.Attachment0 = attachment
+	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	align.RigidityEnabled = true
+	align.Responsiveness = 200
+	align.MaxTorque = math.huge
+	align.Parent = hrp
+
+	spinData[plr] = {
+		align = align,
+		attachment = attachment,
+		connection = nil
+	}
+
+	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
+		local data = spinData[plr]
+		if not data then return end
+		if not plr.Character or plr.Character ~= char then
+			unspin(plr)
+			return
+		end
+
+		-- rotate ONE direction continuously
+		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed) * dt * 60, 0)
+	end)
+end
+
+
+function unspin(plr)
+
+	local data = spinData[plr]
+	if not data then return end
+
 	if data.connection then
 		data.connection:Disconnect()
 	end
-	
-	local character = player.Character
-	if character then
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			humanoid.AutoRotate = true
+
+	if data.align then data.align:Destroy() end
+	if data.attachment then data.attachment:Destroy() end
+
+	local char = plr.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
 		end
 	end
-	
-	activeSpins[player] = nil
+
+	spinData[plr] = nil
 end
 
-local function startSpin(player, speed)
-	local character = player.Character
-	if not character then return end
-	
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if not humanoid or not root then return end
-	
-	-- stop previous spin if exists
-	stopSpin(player)
-	
-	-- clamp speed (prevents physics breaking)
-	speed = math.clamp(speed, 1, 10000)
-	
-	-- disable roblox rotation fighting
-	humanoid.AutoRotate = false
-	
-	-- give server physics control
-	root:SetNetworkOwner(nil)
-	root.AssemblyAngularVelocity = Vector3.zero
-	
-	local currentAngle = 0
-	
-	activeSpins[player] = {}
-	
-	activeSpins[player].connection = RunService.Heartbeat:Connect(function(dt)
-		if not player.Character or player.Character ~= character then
-			stopSpin(player)
-			return
-		end
-		
-		-- increase angle
-		currentAngle += speed * dt * 60
-		
-		-- preserve position
-		local pos = root.Position
-		
-		-- apply rotation (Y axis only)
-		root.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(currentAngle), 0)
-	end)
-end
 
--- Chat listener (you can remove this if using your own command system)
-Players.PlayerAdded:Connect(function(player)
-	
-	player.Chatted:Connect(function(message)
-		local args = string.split(message, " ")
-		
-		if args[1] == "!spin" and args[2] then
-			local speed = tonumber(args[2])
-			if speed then
-				startSpin(player, speed)
-			end
-			
-		elseif args[1] == "!unspin" then
-			stopSpin(player)
-		end
-	end)
-	
-	player.CharacterAdded:Connect(function()
-		stopSpin(player)
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		unspin(plr)
 	end)
 end)
 
