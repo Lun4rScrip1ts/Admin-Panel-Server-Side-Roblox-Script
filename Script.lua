@@ -1163,6 +1163,7 @@ end
 -- SPIN SYSTEM
 -- =============================================================
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local spinData = {}
 
@@ -1181,55 +1182,38 @@ function spin(plr, speed)
 
 	-- stop old spin
 	if spinData[plr] then
-		unspin(plr)
+		spinData[plr]:Disconnect()
 	end
 
-	-- stop humanoid from fighting rotation
 	hum.AutoRotate = false
 
-	-- make server own physics (VERY IMPORTANT)
-	pcall(function()
-		hrp:SetNetworkOwner(nil)
+	local rotationPerSecond = speed * 0.03
+	local currentAngle = 0
+
+	spinData[plr] = RunService.Heartbeat:Connect(function(dt)
+
+		if not plr.Character or not hrp.Parent then
+			return
+		end
+
+		-- tiny incremental rotations (THIS avoids the humanoid cap)
+		currentAngle += rotationPerSecond * dt * 60
+
+		local pos = hrp.Position
+		local newCF = CFrame.new(pos) * CFrame.Angles(0, currentAngle, 0)
+
+		-- we only change rotation, never position
+		hrp.CFrame = newCF
 	end)
-
-	-- attachment
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "SpinAttachment"
-	attachment.Parent = hrp
-
-	-- angular velocity (this is what actually spins)
-	local angular = Instance.new("AngularVelocity")
-	angular.Name = "SpinAngular"
-	angular.Attachment0 = attachment
-	angular.RelativeTo = Enum.ActuatorRelativeTo.World
-
-	-- torque scaled so high speeds work but no fling
-	angular.MaxTorque = 40000 + (speed * 200)
-
-	-- spin speed
-	angular.AngularVelocity = Vector3.new(0, speed, 0)
-
-	angular.Parent = hrp
-
-	spinData[plr] = {
-		attachment = attachment,
-		angular = angular
-	}
 end
 
 
 -- STOP SPIN
 function unspin(plr)
 
-	local data = spinData[plr]
-	if not data then return end
-
-	if data.angular then
-		data.angular:Destroy()
-	end
-
-	if data.attachment then
-		data.attachment:Destroy()
+	if spinData[plr] then
+		spinData[plr]:Disconnect()
+		spinData[plr] = nil
 	end
 
 	local char = plr.Character
@@ -1239,12 +1223,10 @@ function unspin(plr)
 			hum.AutoRotate = true
 		end
 	end
-
-	spinData[plr] = nil
 end
 
 
--- OPTIONAL: clean up on respawn so players don't break
+-- cleanup on respawn
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function()
 		unspin(plr)
