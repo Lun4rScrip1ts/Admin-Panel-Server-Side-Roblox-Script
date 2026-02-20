@@ -1179,27 +1179,32 @@ function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- stop previous spin
-	if spinData[plr] then
-		unspin(plr)
-	end
+	-- kill any previous spin instantly
+	unspin(plr)
 
-	-- disable normal rotation
 	hum.AutoRotate = false
-
-	-- THIS is the important fix
 	hum:ChangeState(Enum.HumanoidStateType.Physics)
 
-	-- server owns movement
 	pcall(function()
 		hrp:SetNetworkOwner(nil)
 	end)
 
+	-- unique spin session id
+	local session = tick()
+
+	spinData[plr] = {
+		id = session
+	}
+
 	local angle = 0
 
-	spinData[plr] = {}
-
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
+
+		local data = spinData[plr]
+		if not data then return end
+
+		-- IMPORTANT: cancels old spins completely
+		if data.id ~= session then return end
 
 		if not plr.Character or plr.Character ~= char then
 			unspin(plr)
@@ -1208,7 +1213,7 @@ function spin(plr, speed)
 
 		local pos = hrp.Position
 
-		-- true unlimited spin speed
+		-- new speed fully overrides old one
 		angle += speed * dt * 60
 
 		hrp.CFrame =
@@ -1232,8 +1237,6 @@ function unspin(plr)
 		local hum = char:FindFirstChildOfClass("Humanoid")
 		if hum then
 			hum.AutoRotate = true
-
-			-- restore humanoid control
 			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
 	end
