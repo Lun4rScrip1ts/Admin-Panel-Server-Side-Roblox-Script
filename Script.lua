@@ -1167,6 +1167,14 @@ local RunService = game:GetService("RunService")
 
 local spinData = {}
 
+local function getRootJoint(char)
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("Motor6D") and v.Name == "RootJoint" then
+			return v
+		end
+	end
+end
+
 function spin(plr, speed)
 
 	speed = tonumber(speed) or 20
@@ -1179,9 +1187,9 @@ function spin(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- kill any previous spin instantly
 	unspin(plr)
 
+	-- stop humanoid rotation
 	hum.AutoRotate = false
 	hum:ChangeState(Enum.HumanoidStateType.Physics)
 
@@ -1189,23 +1197,27 @@ function spin(plr, speed)
 		hrp:SetNetworkOwner(nil)
 	end)
 
-	-- unique spin session id
+	-- LOCK the humanoid motor rotation
+	local rootJoint = getRootJoint(char)
+	local savedC0
+	if rootJoint then
+		savedC0 = rootJoint.C0
+		rootJoint.C0 = CFrame.new(0,0,0)
+	end
+
 	local session = tick()
+	local angle = 0
 
 	spinData[plr] = {
-		id = session
+		id = session,
+		joint = rootJoint,
+		oldC0 = savedC0
 	}
-
-	local angle = 0
 
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
 
 		local data = spinData[plr]
-		if not data then return end
-
-		-- IMPORTANT: cancels old spins completely
-		if data.id ~= session then return end
-
+		if not data or data.id ~= session then return end
 		if not plr.Character or plr.Character ~= char then
 			unspin(plr)
 			return
@@ -1213,7 +1225,7 @@ function spin(plr, speed)
 
 		local pos = hrp.Position
 
-		-- new speed fully overrides old one
+		-- NOW speed is truly unlimited
 		angle += speed * dt * 60
 
 		hrp.CFrame =
@@ -1239,6 +1251,11 @@ function unspin(plr)
 			hum.AutoRotate = true
 			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
+	end
+
+	-- restore root joint
+	if data.joint and data.oldC0 then
+		data.joint.C0 = data.oldC0
 	end
 
 	spinData[plr] = nil
