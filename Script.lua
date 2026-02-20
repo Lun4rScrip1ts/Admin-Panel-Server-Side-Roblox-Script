@@ -1165,95 +1165,90 @@ end
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local spinning = {}
-
-local function getRoot(character)
-return character:FindFirstChild("HumanoidRootPart")
-end
+-- store active spins
+local activeSpins = {}
 
 local function stopSpin(player)
-local data = spinning[player]
-if not data then return end
-
-```
-if data.connection then
-    data.connection:Disconnect()
-end
-
-local char = player.Character
-if char and char:FindFirstChild("Humanoid") then
-    char.Humanoid.AutoRotate = true
-end
-
-spinning[player] = nil
-```
-
+	if not activeSpins[player] then return end
+	
+	local data = activeSpins[player]
+	if data.connection then
+		data.connection:Disconnect()
+	end
+	
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = true
+		end
+	end
+	
+	activeSpins[player] = nil
 end
 
 local function startSpin(player, speed)
-local char = player.Character
-if not char then return end
-
-```
-local humanoid = char:FindFirstChildOfClass("Humanoid")
-local root = getRoot(char)
-if not humanoid or not root then return end
-
-stopSpin(player)
-
--- disable roblox rotation fighting
-humanoid.AutoRotate = false
-
--- server owns physics (prevents fling)
-root:SetNetworkOwner(nil)
-
--- make sure not moving already
-root.AssemblyAngularVelocity = Vector3.zero
-
-local angle = 0
-
-spinning[player] = {}
-
-spinning[player].connection = RunService.Heartbeat:Connect(function(dt)
-    if not player.Character or player.Character ~= char then
-        stopSpin(player)
-        return
-    end
-
-    -- calculate rotation
-    angle += speed * dt * 60
-
-    local pos = root.Position
-
-    -- rotate character but KEEP same position
-    root.CFrame =
-        CFrame.new(pos) *
-        CFrame.Angles(0, math.rad(angle), 0)
-end)
-```
-
+	local character = player.Character
+	if not character then return end
+	
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not root then return end
+	
+	-- stop previous spin if exists
+	stopSpin(player)
+	
+	-- clamp speed (prevents physics breaking)
+	speed = math.clamp(speed, 1, 10000)
+	
+	-- disable roblox rotation fighting
+	humanoid.AutoRotate = false
+	
+	-- give server physics control
+	root:SetNetworkOwner(nil)
+	root.AssemblyAngularVelocity = Vector3.zero
+	
+	local currentAngle = 0
+	
+	activeSpins[player] = {}
+	
+	activeSpins[player].connection = RunService.Heartbeat:Connect(function(dt)
+		if not player.Character or player.Character ~= character then
+			stopSpin(player)
+			return
+		end
+		
+		-- increase angle
+		currentAngle += speed * dt * 60
+		
+		-- preserve position
+		local pos = root.Position
+		
+		-- apply rotation (Y axis only)
+		root.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(currentAngle), 0)
+	end)
 end
 
+-- Chat listener (you can remove this if using your own command system)
 Players.PlayerAdded:Connect(function(player)
-
-```
-player.Chatted:Connect(function(msg)
-    local args = string.split(msg," ")
-
-    if args[1] == "!spin" then
-        local speed = tonumber(args[2]) or 20
-        startSpin(player, speed)
-
-    elseif args[1] == "!unspin" then
-        stopSpin(player)
-    end
-end)
-
-player.CharacterAdded:Connect(function()
-    stopSpin(player)
-end)
-```
-
+	
+	player.Chatted:Connect(function(message)
+		local args = string.split(message, " ")
+		
+		if args[1] == "!spin" and args[2] then
+			local speed = tonumber(args[2])
+			if speed then
+				startSpin(player, speed)
+			end
+			
+		elseif args[1] == "!unspin" then
+			stopSpin(player)
+		end
+	end)
+	
+	player.CharacterAdded:Connect(function()
+		stopSpin(player)
+	end)
 end)
 
 -- =============================================================
