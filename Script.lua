@@ -1162,11 +1162,6 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local spinData = {}
-
 function spin(plr, speed)
 
 	speed = tonumber(speed) or 20
@@ -1200,62 +1195,21 @@ function spin(plr, speed)
 	align.Responsiveness = 200
 	align.MaxTorque = math.huge
 
-	-- LOCK rotation axis (prevents laying down)
+	-- THE IMPORTANT CHANGE
+	align.ReactionTorqueEnabled = false
 	align.PrimaryAxisOnly = true
 	align.PrimaryAxis = Vector3.new(0,1,0)
+
+	-- instead of rotating to angles, we spin forever
+	align.AngularVelocity = Vector3.new(0, speed, 0)
 
 	align.Parent = hrp
 
 	spinData[plr] = {
 		align = align,
-		attachment = attachment,
-		angle = 0,
-		connection = nil
+		attachment = attachment
 	}
-
-	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
-		if spinData[plr] then
-			local data = spinData[plr]
-
-			-- ALWAYS increase (one direction only)
-			data.angle = data.angle + (math.abs(speed) * dt)
-
-			-- keep upright + rotate Y only
-			align.CFrame = CFrame.Angles(0, data.angle, 0)
-		end
-	end)
 end
-
-
-function unspin(plr)
-
-	local data = spinData[plr]
-	if not data then return end
-
-	if data.connection then
-		data.connection:Disconnect()
-	end
-
-	if data.align then data.align:Destroy() end
-	if data.attachment then data.attachment:Destroy() end
-
-	local char = plr.Character
-	if char then
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum.AutoRotate = true
-		end
-	end
-
-	spinData[plr] = nil
-end
-
-
-Players.PlayerAdded:Connect(function(plr)
-	plr.CharacterAdded:Connect(function()
-		unspin(plr)
-	end)
-end)
 -- =============================================================
 -- LEAVE COMMAND
 -- =============================================================
