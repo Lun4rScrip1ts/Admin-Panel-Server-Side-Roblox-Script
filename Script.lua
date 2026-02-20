@@ -1186,35 +1186,36 @@ function spin(plr, speed)
 
 	hum.AutoRotate = false
 
+	-- Attachment (YOU ALREADY HAD THIS)
 	local attachment = Instance.new("Attachment")
+	attachment.Name = "SpinAttachment"
 	attachment.Parent = hrp
 
-	local align = Instance.new("AlignOrientation")
-	align.Attachment0 = attachment
-	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	align.RigidityEnabled = true
-	align.Responsiveness = 200
-	align.MaxTorque = math.huge
-	align.PrimaryAxisOnly = true
-	align.PrimaryAxis = Vector3.new(0,1,0)
-	align.Parent = hrp
+	-- REAL SPIN MOTOR (replaces AlignOrientation only)
+	local angular = Instance.new("AngularVelocity")
+	angular.Name = "SpinVelocity"
+	angular.Attachment0 = attachment
+	angular.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	angular.MaxTorque = math.huge
+
+	-- the actual speed you type
+	angular.AngularVelocity = Vector3.new(0, speed, 0)
+
+	angular.Parent = hrp
 
 	spinData[plr] = {
-		align = align,
 		attachment = attachment,
-		speed = speed
+		angular = angular,
+		connection = nil
 	}
 
-	-- THIS IS THE REAL FIX
-	spinData[plr].connection = RunService.Stepped:Connect(function(_, dt)
-
-		-- constantly force server physics ownership
-		pcall(function()
-			hrp:SetNetworkOwner(nil)
-		end)
-
-		-- continuous one-direction rotation
-		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed) * dt * 60, 0)
+	-- keep server ownership so Roblox doesn't override it
+	spinData[plr].connection = RunService.Stepped:Connect(function()
+		if hrp and hrp.Parent then
+			pcall(function()
+				hrp:SetNetworkOwner(nil)
+			end)
+		end
 	end)
 end
 
@@ -1228,8 +1229,13 @@ function unspin(plr)
 		data.connection:Disconnect()
 	end
 
-	if data.align then data.align:Destroy() end
-	if data.attachment then data.attachment:Destroy() end
+	if data.angular then
+		data.angular:Destroy()
+	end
+
+	if data.attachment then
+		data.attachment:Destroy()
+	end
 
 	local char = plr.Character
 	if char then
