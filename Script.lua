@@ -1162,71 +1162,96 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
+local RunService = game:GetService("RunService")
+
 local spinData = {}
+
+local function getRootJoint(character)
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    
+    -- R15
+    local root = hrp:FindFirstChild("RootJoint")
+    if root then return root end
+    
+    -- R6 fallback
+    local torso = character:FindFirstChild("Torso")
+    if torso then
+        for _,v in pairs(torso:GetChildren()) do
+            if v:IsA("Motor6D") and v.Name == "RootJoint" then
+                return v
+            end
+        end
+    end
+    
+    return nil
+end
+
 
 local function spin(plr, speed)
     if plr ~= client then
-        notify("❌ Spin only works on yourself", Color3.fromRGB(255, 100, 100))
+        notify("❌ Spin only works on yourself", Color3.fromRGB(255,100,100))
         return
     end
-    local hrp = getHRP(plr)
-    if not hrp or spinData[plr] then return end
+    
+    if spinData[plr] then
+        unspin(plr)
+    end
     
     speed = tonumber(speed) or 20
+    speed = math.clamp(speed, 1, 10000)
     
-    local attachment = Instance.new("Attachment")
-    attachment.Parent = hrp
+    local char = plr.Character
+    if not char then return end
     
-    local angularVel = Instance.new("AngularVelocity")
-    angularVel.Attachment0 = attachment
-    angularVel.MaxTorque = math.huge
-    angularVel.AngularVelocity = Vector3.new(0, speed, 0)
-    angularVel.Parent = hrp
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
     
-    local bodyPos = Instance.new("BodyPosition")
-    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyPos.Position = hrp.Position
-    bodyPos.Parent = hrp
-    
-    spinData[plr] = {
-        angularVel = angularVel,
-        attachment = attachment,
-        bodyPos = bodyPos,
-        connection = nil
-    }
-    
-    spinData[plr].connection = RunService.Heartbeat:Connect(function()
-        if bodyPos and hrp then
-            bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
-        end
-    end)
-    
-    notify("🌀 Spinning at " .. speed .. " speed", currentTheme.accent)
-end
-
-local function unspin(plr)
-    if plr ~= client then
-        notify("❌ Unspin only works on yourself", Color3.fromRGB(255, 100, 100))
+    local rootJoint = getRootJoint(char)
+    if not rootJoint then
+        notify("❌ Could not find RootJoint", Color3.fromRGB(255,100,100))
         return
     end
+    
+    hum.AutoRotate = false
+    
+    local rotation = 0
+    local originalC0 = rootJoint.C0
+    
+    spinData[plr] = {}
+    
+    spinData[plr].connection = RunService.RenderStepped:Connect(function(dt)
+        if not rootJoint.Parent then return end
+        
+        rotation += speed * dt
+        
+        rootJoint.C0 = originalC0 * CFrame.Angles(0, rotation, 0)
+    end)
+    
+    notify("🌀 Spinning at "..speed, currentTheme.accent)
+end
+
+
+local function unspin(plr)
     if not spinData[plr] then return end
     
-    local data = spinData[plr]
-    if data.connection then
-        data.connection:Disconnect()
-    end
-    if data.angularVel then
-        data.angularVel:Destroy()
-    end
-    if data.attachment then
-        data.attachment:Destroy()
-    end
-    if data.bodyPos then
-        data.bodyPos:Destroy()
+    local char = plr.Character
+    if char then
+        local rootJoint = getRootJoint(char)
+        if rootJoint then
+            rootJoint.C0 = CFrame.new(rootJoint.C0.Position)
+        end
+        
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.AutoRotate = true
+        end
     end
     
+    spinData[plr].connection:Disconnect()
     spinData[plr] = nil
-    notify("✅ Spin stopped", Color3.fromRGB(200, 200, 200))
+    
+    notify("✅ Spin stopped", Color3.fromRGB(200,200,200))
 end
 
 -- =============================================================
