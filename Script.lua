@@ -1168,21 +1168,20 @@ local spinData = {}
 
 local function spin(plr, speed)
 	if plr ~= client then
-		notify("❌ Spin only works on yourself", Color3.fromRGB(255,100,100))
+		notify("❌ Spin only works on yourself", Color3.fromRGB(255, 100, 100))
 		return
 	end
 	
 	if spinData[plr] then return end
 	
-	speed = tonumber(speed) or 20
-	speed = math.clamp(speed, 1, 10000)
-
 	local char = plr.Character
 	if not char then return end
 	
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
+	
+	speed = tonumber(speed) or 20
 	
 	hum.AutoRotate = false
 	
@@ -1195,35 +1194,16 @@ local function spin(plr, speed)
 		
 		rotation += speed * dt
 		
-		-- If seated, spin the whole seat assembly
-		if hum.SeatPart then
-			local seat = hum.SeatPart
-			if seat and seat:IsA("BasePart") then
-				local model = seat:FindFirstAncestorOfClass("Model")
-				if model and model.PrimaryPart then
-					local pos = model.PrimaryPart.Position
-					model:SetPrimaryPartCFrame(
-						CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-					)
-				else
-					local pos = seat.Position
-					seat.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-				end
-			end
-		else
-			-- Normal walking / standing spin
-			local pos = hrp.Position
-			hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
-		end
+		local pos = hrp.Position
+		hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, rotation, 0)
 	end)
 	
-	notify("🌀 Spinning at speed " .. speed, currentTheme.accent)
+	notify("🌀 Auto spinning at speed " .. speed, currentTheme.accent)
 end
-
 
 local function unspin(plr)
 	if plr ~= client then
-		notify("❌ Unspin only works on yourself", Color3.fromRGB(255,100,100))
+		notify("❌ Unspin only works on yourself", Color3.fromRGB(255, 100, 100))
 		return
 	end
 	
@@ -1244,7 +1224,7 @@ local function unspin(plr)
 	
 	spinData[plr] = nil
 	
-	notify("✅ Spin stopped", Color3.fromRGB(200,200,200))
+	notify("✅ Spin stopped", Color3.fromRGB(200, 200, 200))
 end
 
 -- =============================================================
