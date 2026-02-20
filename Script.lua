@@ -1162,10 +1162,9 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-local spinLoops = {}
+local spinData = {}
 
 function spin(plr, speed)
 
@@ -1175,51 +1174,67 @@ function spin(plr, speed)
 	local char = plr.Character
 	if not char then return end
 
-	local hum = char:FindFirstChildOfClass("Humanoid")
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hum or not hrp then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hrp or not hum then return end
 
-	-- stop old spin
-	if spinLoops[plr] then
-		spinLoops[plr]:Disconnect()
+	-- Stop old spin
+	if spinData[plr] then
+		unspin(plr)
 	end
 
-	hum.AutoRotate = true
-	hum.WalkSpeed = 0 -- prevents actual walking
+	hum.AutoRotate = false
 
-	local t = 0
-	local spinRate = speed * 0.04
+	-- Server owns physics
+	pcall(function()
+		hrp:SetNetworkOwner(nil)
+	end)
 
-	spinLoops[plr] = RunService.Heartbeat:Connect(function(dt)
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = hrp
 
-		if not plr.Character or not hrp.Parent then return end
+	local align = Instance.new("AlignOrientation")
+	align.Attachment0 = attachment
+	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	align.RigidityEnabled = false
+	align.Responsiveness = speed * 2
+	align.MaxTorque = math.huge
 
-		t += dt * spinRate
+	align.Parent = hrp
 
-		-- circular direction vector
-		local dir = Vector3.new(math.cos(t), 0, math.sin(t))
+	spinData[plr] = {
+		align = align,
+		attachment = attachment,
+		angle = 0
+	}
 
-		-- THIS is the magic line
-		hum:Move(dir, false)
+	game:GetService("RunService").Heartbeat:Connect(function(dt)
+		if spinData[plr] then
+			local data = spinData[plr]
+			data.angle += speed * dt
+			align.CFrame = CFrame.Angles(0, data.angle, 0)
+		end
 	end)
 end
 
 
 function unspin(plr)
 
-	if spinLoops[plr] then
-		spinLoops[plr]:Disconnect()
-		spinLoops[plr] = nil
-	end
+	local data = spinData[plr]
+	if not data then return end
+
+	if data.align then data.align:Destroy() end
+	if data.attachment then data.attachment:Destroy() end
 
 	local char = plr.Character
-	if not char then return end
-
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if hum then
-		hum:Move(Vector3.zero, false)
-		hum.WalkSpeed = 16
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
+		end
 	end
+
+	spinData[plr] = nil
 end
 
 
