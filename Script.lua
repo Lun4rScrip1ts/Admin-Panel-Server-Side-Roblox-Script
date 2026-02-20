@@ -1162,87 +1162,55 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local spinConnections = {}
 
-local function getParts(plr)
-	local char = plr.Character
-	if not char then return end
-
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local hum = char:FindFirstChildOfClass("Humanoid")
-
-	if not hrp or not hum then return end
-	return char, hrp, hum
-end
-
-
--- START SPIN
 function spin(plr, speed)
 
 	speed = tonumber(speed) or 20
-	speed = math.clamp(speed,1,10000)
+	speed = math.clamp(speed, 1, 10000)
 
-	local char, hrp, hum = getParts(plr)
+	local char = plr.Character
 	if not char then return end
 
-	-- stop old spin
+	-- stop previous spin
 	if spinConnections[plr] then
 		spinConnections[plr]:Disconnect()
 	end
-
-	-- THIS is the important part
-	hum.AutoRotate = false
-	hum.PlatformStand = true   -- prevents Roblox from forcing a facing direction
 
 	local angle = 0
 	local radiansPerSecond = speed * 0.05
 
 	spinConnections[plr] = RunService.Heartbeat:Connect(function(dt)
 
-		if not plr.Character or not hrp.Parent then return end
+		if not plr.Character or not char.Parent then return end
 
 		angle += radiansPerSecond * dt * 60
 
-		local pos = hrp.Position
+		local currentPivot = char:GetPivot()
+		local position = currentPivot.Position
 
-		-- keep upright while spinning
-		hrp.CFrame =
-			CFrame.new(pos)
-			* CFrame.Angles(0, angle, 0)
-
-		-- prevents falling over
-		hrp.AssemblyLinearVelocity = Vector3.new(
-			hrp.AssemblyLinearVelocity.X,
-			0,
-			hrp.AssemblyLinearVelocity.Z
+		-- Rotate entire character model
+		char:PivotTo(
+			CFrame.new(position) *
+			CFrame.Angles(0, angle, 0)
 		)
 	end)
 end
 
 
--- STOP SPIN
 function unspin(plr)
 
 	if spinConnections[plr] then
 		spinConnections[plr]:Disconnect()
 		spinConnections[plr] = nil
 	end
-
-	local char = plr.Character
-	if not char then return end
-
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if hum then
-		hum.PlatformStand = false
-		hum.AutoRotate = true
-	end
 end
 
 
--- clean respawn
+-- Cleanup on respawn
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function()
 		unspin(plr)
