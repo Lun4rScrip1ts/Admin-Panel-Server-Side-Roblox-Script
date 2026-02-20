@@ -1186,38 +1186,31 @@ function spin(plr, speed)
 
 	hum.AutoRotate = false
 
-	-- Server owns physics
+	-- server owns physics (prevents fling)
 	pcall(function()
 		hrp:SetNetworkOwner(nil)
 	end)
 
-	local attachment = Instance.new("Attachment")
-	attachment.Parent = hrp
+	local angle = 0
 
-	local align = Instance.new("AlignOrientation")
-	align.Attachment0 = attachment
-	align.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	align.RigidityEnabled = true
-	align.Responsiveness = 200
-	align.MaxTorque = math.huge
-	align.Parent = hrp
-
-	spinData[plr] = {
-		align = align,
-		attachment = attachment,
-		connection = nil
-	}
-
+	spinData[plr] = {}
 	spinData[plr].connection = RunService.Heartbeat:Connect(function(dt)
-		local data = spinData[plr]
-		if not data then return end
+
 		if not plr.Character or plr.Character ~= char then
 			unspin(plr)
 			return
 		end
 
-		-- rotate ONE direction continuously
-		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed) * dt * 60, 0)
+		-- keep same position
+		local pos = hrp.Position
+
+		-- accumulate rotation
+		angle += speed * dt * 60
+
+		-- rotate character (NO physics forces)
+		hrp.CFrame =
+			CFrame.new(pos) *
+			CFrame.Angles(0, math.rad(angle), 0)
 	end)
 end
 
@@ -1230,9 +1223,6 @@ function unspin(plr)
 	if data.connection then
 		data.connection:Disconnect()
 	end
-
-	if data.align then data.align:Destroy() end
-	if data.attachment then data.attachment:Destroy() end
 
 	local char = plr.Character
 	if char then
