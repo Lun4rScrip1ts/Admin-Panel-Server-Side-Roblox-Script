@@ -1165,7 +1165,7 @@ end
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-local spinConnections = {}
+local spinLoops = {}
 
 function spin(plr, speed)
 
@@ -1175,42 +1175,54 @@ function spin(plr, speed)
 	local char = plr.Character
 	if not char then return end
 
-	-- stop previous spin
-	if spinConnections[plr] then
-		spinConnections[plr]:Disconnect()
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp then return end
+
+	-- stop old spin
+	if spinLoops[plr] then
+		spinLoops[plr]:Disconnect()
 	end
 
-	local angle = 0
-	local radiansPerSecond = speed * 0.05
+	hum.AutoRotate = true
+	hum.WalkSpeed = 0 -- prevents actual walking
 
-	spinConnections[plr] = RunService.Heartbeat:Connect(function(dt)
+	local t = 0
+	local spinRate = speed * 0.04
 
-		if not plr.Character or not char.Parent then return end
+	spinLoops[plr] = RunService.Heartbeat:Connect(function(dt)
 
-		angle += radiansPerSecond * dt * 60
+		if not plr.Character or not hrp.Parent then return end
 
-		local currentPivot = char:GetPivot()
-		local position = currentPivot.Position
+		t += dt * spinRate
 
-		-- Rotate entire character model
-		char:PivotTo(
-			CFrame.new(position) *
-			CFrame.Angles(0, angle, 0)
-		)
+		-- circular direction vector
+		local dir = Vector3.new(math.cos(t), 0, math.sin(t))
+
+		-- THIS is the magic line
+		hum:Move(dir, false)
 	end)
 end
 
 
 function unspin(plr)
 
-	if spinConnections[plr] then
-		spinConnections[plr]:Disconnect()
-		spinConnections[plr] = nil
+	if spinLoops[plr] then
+		spinLoops[plr]:Disconnect()
+		spinLoops[plr] = nil
+	end
+
+	local char = plr.Character
+	if not char then return end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum:Move(Vector3.zero, false)
+		hum.WalkSpeed = 16
 	end
 end
 
 
--- Cleanup on respawn
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function()
 		unspin(plr)
