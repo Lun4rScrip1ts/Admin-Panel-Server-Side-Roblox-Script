@@ -1169,63 +1169,77 @@ local function spin(plr, speed)
         notify("❌ Spin only works on yourself", Color3.fromRGB(255, 100, 100))
         return
     end
+    
+    if spinData[plr] then
+        unspin(plr)
+    end
+    
     local hrp = getHRP(plr)
-    if not hrp or spinData[plr] then return end
+    if not hrp then return end
     
     speed = tonumber(speed) or 20
+    speed = math.clamp(speed, 1, 10000)
+    
+    local char = plr.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    
+    hum.AutoRotate = false
+    
+    -- Ensure client owns physics (prevents fling)
+    pcall(function()
+        hrp:SetNetworkOwner(plr)
+    end)
     
     local attachment = Instance.new("Attachment")
     attachment.Parent = hrp
     
     local angularVel = Instance.new("AngularVelocity")
     angularVel.Attachment0 = attachment
-    angularVel.MaxTorque = math.huge
-    angularVel.AngularVelocity = Vector3.new(0, speed, 0)
-    angularVel.Parent = hrp
     
-    local bodyPos = Instance.new("BodyPosition")
-    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyPos.Position = hrp.Position
-    bodyPos.Parent = hrp
+    -- IMPORTANT FIX:
+    angularVel.MaxTorque = 50000 -- NOT math.huge
+    angularVel.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+    angularVel.AngularVelocity = Vector3.new(0, speed, 0)
+    
+    angularVel.Parent = hrp
     
     spinData[plr] = {
         angularVel = angularVel,
-        attachment = attachment,
-        bodyPos = bodyPos,
-        connection = nil
+        attachment = attachment
     }
-    
-    spinData[plr].connection = RunService.Heartbeat:Connect(function()
-        if bodyPos and hrp then
-            bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
-        end
-    end)
     
     notify("🌀 Spinning at " .. speed .. " speed", currentTheme.accent)
 end
+
 
 local function unspin(plr)
     if plr ~= client then
         notify("❌ Unspin only works on yourself", Color3.fromRGB(255, 100, 100))
         return
     end
+    
     if not spinData[plr] then return end
     
     local data = spinData[plr]
-    if data.connection then
-        data.connection:Disconnect()
-    end
+    
     if data.angularVel then
         data.angularVel:Destroy()
     end
     if data.attachment then
         data.attachment:Destroy()
     end
-    if data.bodyPos then
-        data.bodyPos:Destroy()
+    
+    local char = plr.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.AutoRotate = true
+        end
     end
     
     spinData[plr] = nil
+    
     notify("✅ Spin stopped", Color3.fromRGB(200, 200, 200))
 end
 
