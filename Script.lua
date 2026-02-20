@@ -1163,36 +1163,13 @@ end
 -- SPIN SYSTEM
 -- =============================================================
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local spinning = {}
+local spinData = {}
 
-local function StopSpin(plr)
-	local data = spinning[plr]
-	if not data then return end
+function spin(plr, speed)
 
-	if data.angVel then
-		data.angVel:Destroy()
-	end
-	if data.attach then
-		data.attach:Destroy()
-	end
-
-	local char = plr.Character
-	if char then
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum.AutoRotate = true
-			hum.PlatformStand = false
-		end
-	end
-
-	spinning[plr] = nil
-end
-
-function SpinPlayer(plr, speed)
-
-	speed = tonumber(speed)
-	if not speed then return end
+	speed = tonumber(speed) or 20
 	speed = math.clamp(speed, 1, 10000)
 
 	local char = plr.Character
@@ -1202,47 +1179,80 @@ function SpinPlayer(plr, speed)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- remove old spin FIRST
-	StopSpin(plr)
-
-	-- server owns physics (VERY IMPORTANT)
-	pcall(function()
-		hrp:SetNetworkOwner(nil)
-	end)
+	-- Stop old spin
+	if spinData[plr] then
+		unspin(plr)
+	end
 
 	hum.AutoRotate = false
-	hum.PlatformStand = false
 
-	-- attachment
-	local attach = Instance.new("Attachment")
-	attach.Parent = hrp
+	-- Attachment (YOU ALREADY HAD THIS)
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SpinAttachment"
+	attachment.Parent = hrp
 
-	-- THIS is the real spinner
-	local angVel = Instance.new("AngularVelocity")
-	angVel.Attachment0 = attach
-	angVel.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
-	angVel.MaxTorque = math.huge
+	-- REAL SPIN MOTOR (replaces AlignOrientation only)
+	local angular = Instance.new("AngularVelocity")
+	angular.Name = "SpinVelocity"
+	angular.Attachment0 = attachment
+	angular.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	angular.MaxTorque = math.huge
 
-	-- rotation ONLY around Y axis (no laying down ever)
-	angVel.AngularVelocity = Vector3.new(0, speed, 0)
+	-- the actual speed you type
+	angular.AngularVelocity = Vector3.new(0, speed, 0)
 
-	angVel.Parent = hrp
+	angular.Parent = hrp
 
-	spinning[plr] = {
-		angVel = angVel,
-		attach = attach
+	spinData[plr] = {
+		attachment = attachment,
+		angular = angular,
+		connection = nil
 	}
+
+	-- keep server ownership so Roblox doesn't override it
+	spinData[plr].connection = RunService.Stepped:Connect(function()
+		if hrp and hrp.Parent then
+			pcall(function()
+				hrp:SetNetworkOwner(nil)
+			end)
+		end
+	end)
 end
+
+
+function unspin(plr)
+
+	local data = spinData[plr]
+	if not data then return end
+
+	if data.connection then
+		data.connection:Disconnect()
+	end
+
+	if data.angular then
+		data.angular:Destroy()
+	end
+
+	if data.attachment then
+		data.attachment:Destroy()
+	end
+
+	local char = plr.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
+		end
+	end
+
+	spinData[plr] = nil
+end
+
 
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function()
-		StopSpin(plr)
+		unspin(plr)
 	end)
-end)
-
--- OPTIONAL unspin command
-game.Players.PlayerRemoving:Connect(function(plr)
-	StopSpin(plr)
 end)
 -- =============================================================
 -- LEAVE COMMAND
