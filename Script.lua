@@ -1162,6 +1162,11 @@ end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local spinData = {}
+
 function spin(plr, speed)
 
 	speed = tonumber(speed) or 20
@@ -1181,10 +1186,6 @@ function spin(plr, speed)
 
 	hum.AutoRotate = false
 
-	pcall(function()
-		hrp:SetNetworkOwner(nil)
-	end)
-
 	local attachment = Instance.new("Attachment")
 	attachment.Parent = hrp
 
@@ -1194,22 +1195,59 @@ function spin(plr, speed)
 	align.RigidityEnabled = true
 	align.Responsiveness = 200
 	align.MaxTorque = math.huge
-
-	-- THE IMPORTANT CHANGE
-	align.ReactionTorqueEnabled = false
 	align.PrimaryAxisOnly = true
 	align.PrimaryAxis = Vector3.new(0,1,0)
-
-	-- instead of rotating to angles, we spin forever
-	align.AngularVelocity = Vector3.new(0, speed, 0)
-
 	align.Parent = hrp
 
 	spinData[plr] = {
 		align = align,
-		attachment = attachment
+		attachment = attachment,
+		speed = speed
 	}
+
+	-- THIS IS THE REAL FIX
+	spinData[plr].connection = RunService.Stepped:Connect(function(_, dt)
+
+		-- constantly force server physics ownership
+		pcall(function()
+			hrp:SetNetworkOwner(nil)
+		end)
+
+		-- continuous one-direction rotation
+		align.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed) * dt * 60, 0)
+	end)
 end
+
+
+function unspin(plr)
+
+	local data = spinData[plr]
+	if not data then return end
+
+	if data.connection then
+		data.connection:Disconnect()
+	end
+
+	if data.align then data.align:Destroy() end
+	if data.attachment then data.attachment:Destroy() end
+
+	local char = plr.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
+		end
+	end
+
+	spinData[plr] = nil
+end
+
+
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		unspin(plr)
+	end)
+end)
 -- =============================================================
 -- LEAVE COMMAND
 -- =============================================================
