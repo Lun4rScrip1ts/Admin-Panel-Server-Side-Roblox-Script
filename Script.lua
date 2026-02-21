@@ -250,7 +250,44 @@ local function notify(text, col)
         task.delay(0.6, function() f:Destroy() end)
     end)
 end
+-- =============================================================
+-- CLICK TP SYSTEM
+-- =============================================================
+local clickTPData = {
+    enabled = false,
+    connection = nil
+}
 
+local function enableClickTP()
+    if clickTPData.enabled then return end
+    clickTPData.enabled = true
+    
+    clickTPData.connection = Mouse.Button2Down:Connect(function()
+        if Mouse.Target then
+            local hrp = getHRP(client)
+            if hrp then
+                hrp.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
+                notify("✅ Teleported!", Color3.fromRGB(100, 255, 150))
+            else
+                notify("❌ Character not found!", Color3.fromRGB(255, 100, 100))
+            end
+        end
+    end)
+    
+    notify("✅ Click TP enabled - RIGHT CLICK anywhere to teleport", Color3.fromRGB(100, 255, 120))
+end
+
+local function disableClickTP()
+    if not clickTPData.enabled then return end
+    clickTPData.enabled = false
+    
+    if clickTPData.connection then
+        clickTPData.connection:Disconnect()
+        clickTPData.connection = nil
+    end
+    
+    notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
+end
 -- =============================================================
 -- FIXED FLY SYSTEM
 -- =============================================================
