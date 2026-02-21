@@ -2639,24 +2639,50 @@ local function ping()
     notify("📶 Ping: " .. ping .. "ms", color)
 end
 
-local clickTPconn
-local function clickTP()
+-- Toggleable Click TP for exploit/admin use
+-- Keeps your original style + notify + toggle logic
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer  -- this assumes client execution (most exploits allow this)
+local mouse = player:GetMouse()
+
+local clickTPconn = nil
+
+local function getHRP(plr)
+    if not plr or not plr.Character then return nil end
+    return plr.Character:FindFirstChild("HumanoidRootPart") 
+        or plr.Character:FindFirstChild("Torso") 
+        or plr.Character:FindFirstChildWhichIsA("BasePart", true)
+end
+
+-- Your original notify (replace with your admin's notify if different)
+local function notify(msg, color)
+    -- Many admin systems have a global notify function
+    -- If yours does, use: notify(msg, color) or whatever it is
+    -- Fallback for testing:
+    print(msg)
+    -- or game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Click TP", Text = msg, Duration = 4})
+end
+
+local function clickTP()   -- renamed slightly to match your original function name
     if clickTPconn then
         clickTPconn:Disconnect()
         clickTPconn = nil
         notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
     else
-        clickTPconn = Mouse.Button1Down:Connect(function()
-            if Mouse.Target then
-                local hrp = getHRP(client)
+        clickTPconn = mouse.Button1Down:Connect(function()
+            if mouse.Target then
+                local hrp = getHRP(player)  -- fixed: use player instead of undefined 'client'
                 if hrp then
-                    hrp.CFrame = Mouse.Hit + Vector3.new(0, 3, 0)
+                    hrp.CFrame = mouse.Hit + Vector3.new(0, 3, 0)
                 end
             end
         end)
         notify("✅ Click TP enabled - click anywhere to teleport", Color3.fromRGB(100, 255, 120))
     end
 end
+
+-- Now the trigger — choose
 
 local function setFov(val)
     local num = tonumber(val)
