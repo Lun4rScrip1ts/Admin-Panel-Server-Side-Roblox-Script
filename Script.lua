@@ -2639,49 +2639,25 @@ local function ping()
     notify("📶 Ping: " .. ping .. "ms", color)
 end
 
-local client = game:GetService("Players").LocalPlayer
-local Mouse = client:GetMouse()
+
 local clickTPconn
-
--- Helper function to get HumanoidRootPart
-local function getHRP(player)
-    local char = player.Character
-    if char then
-        return char:FindFirstChild("HumanoidRootPart")
-    end
-    return nil
-end
-
--- Simple notify function (replace with your own if you have one)
-local function notify(text, color)
-    print(text) -- Fallback if you don't have a notify system
-    -- If you have a custom notify function, use that instead
-end
-
 local function clickTP()
     if clickTPconn then
         clickTPconn:Disconnect()
         clickTPconn = nil
         notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
     else
-        -- Use Button2Down for RIGHT CLICK (Button1Down is left click)
-        clickTPconn = Mouse.Button2Down:Connect(function()
+        clickTPconn = Mouse.Button1Down:Connect(function()
             if Mouse.Target then
                 local hrp = getHRP(client)
                 if hrp then
-                    -- Teleport 3 studs above the clicked point
-                    hrp.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
-                else
-                    notify("❌ Character not found!", Color3.fromRGB(255, 100, 100))
+                    hrp.CFrame = Mouse.Hit + Vector3.new(0, 3, 0)
                 end
             end
         end)
-        notify("✅ Click TP enabled - RIGHT CLICK anywhere to teleport", Color3.fromRGB(100, 255, 120))
+        notify("✅ Click TP enabled - click anywhere to teleport", Color3.fromRGB(100, 255, 120))
     end
 end
-
--- Run it
-clickTP()
 
 local function setFov(val)
     local num = tonumber(val)
