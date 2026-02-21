@@ -2629,9 +2629,16 @@ local function fling(plr)
     end
 end
 
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local function rejoin()
-    notify("🔄 Rejoining server...", Color3.fromRGB(100, 200, 255))
-    TeleportService:Teleport(game.PlaceId, client)
+    -- Optional: show a little notification (if you have a notify function already)
+    notify("🔄 Rejoining same server...", Color3.fromRGB(100, 200, 255))
+    
+    -- This rejoins **exactly** the current server (using current JobId)
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end
 
 local function ping()
