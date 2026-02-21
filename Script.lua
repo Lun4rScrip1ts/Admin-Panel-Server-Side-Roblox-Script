@@ -2639,32 +2639,30 @@ local function ping()
     notify("📶 Ping: " .. ping .. "ms", color)
 end
 
--- Toggleable Click TP for exploit/admin use
--- Keeps your original style + notify + toggle logic
+-- Fixed Click TP Toggle for exploit/admin (MUST run client-side!)
+-- Execute this snippet directly in your executor when in-game.
 
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer  -- this assumes client execution (most exploits allow this)
+local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
-local clickTPconn = nil
+local clickTPconn
+
+local function notify(msg, color)
+    -- If your admin has a custom notify, replace this line with it
+    -- Example fallbacks:
+    -- game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Click TP", Text = msg, Duration = 5})
+    print(msg)  -- at least prints to console/output
+end
 
 local function getHRP(plr)
     if not plr or not plr.Character then return nil end
     return plr.Character:FindFirstChild("HumanoidRootPart") 
-        or plr.Character:FindFirstChild("Torso") 
-        or plr.Character:FindFirstChildWhichIsA("BasePart", true)
+        or plr.Character:FindFirstChild("Torso")
+        or plr.Character.PrimaryPart
 end
 
--- Your original notify (replace with your admin's notify if different)
-local function notify(msg, color)
-    -- Many admin systems have a global notify function
-    -- If yours does, use: notify(msg, color) or whatever it is
-    -- Fallback for testing:
-    print(msg)
-    -- or game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Click TP", Text = msg, Duration = 4})
-end
-
-local function clickTP()   -- renamed slightly to match your original function name
+local function clickTP()
     if clickTPconn then
         clickTPconn:Disconnect()
         clickTPconn = nil
@@ -2672,9 +2670,11 @@ local function clickTP()   -- renamed slightly to match your original function n
     else
         clickTPconn = mouse.Button1Down:Connect(function()
             if mouse.Target then
-                local hrp = getHRP(player)  -- fixed: use player instead of undefined 'client'
+                local hrp = getHRP(player)  -- fixed: use player (LocalPlayer), not undefined 'client'
                 if hrp then
                     hrp.CFrame = mouse.Hit + Vector3.new(0, 3, 0)
+                else
+                    print("No HRP found - character not loaded?")
                 end
             end
         end)
@@ -2682,7 +2682,25 @@ local function clickTP()   -- renamed slightly to match your original function n
     end
 end
 
--- Now the trigger — choose
+-- Trigger it somehow — pick ONE:
+
+-- A) Immediate toggle (easiest for testing)
+clickTP()
+
+-- B) Keybind (press RightShift to toggle, change as needed)
+--[[
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        clickTP()
+    end
+end)
+print("Press RightShift to toggle Click TP")
+--]]
+
+-- C) If your admin has chat commands — add to its handler:
+-- if args[1] == "clicktp" or args[1] == "ctp" then clickTP() end
 
 local function setFov(val)
     local num = tonumber(val)
