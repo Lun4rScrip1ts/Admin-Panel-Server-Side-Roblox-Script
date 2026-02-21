@@ -255,18 +255,24 @@ end
 -- =============================================================
 local clickTPData = {
     enabled = false,
-    connection = nil
+    connection = nil,
+    mouse = nil -- Store mouse reference here too
 }
 
 local function enableClickTP()
-    if clickTPData.enabled then return end
-    clickTPData.enabled = true
+    if clickTPData.enabled then 
+        notify("⚠️ Click TP is already enabled", Color3.fromRGB(255, 200, 100))
+        return 
+    end
     
-    clickTPData.connection = Mouse.Button2Down:Connect(function()
-        if Mouse.Target then
+    clickTPData.enabled = true
+    clickTPData.mouse = client:GetMouse() -- Get fresh mouse reference
+    
+    clickTPData.connection = clickTPData.mouse.Button2Down:Connect(function()
+        if clickTPData.mouse.Target then
             local hrp = getHRP(client)
             if hrp then
-                hrp.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
+                hrp.CFrame = CFrame.new(clickTPData.mouse.Hit.Position + Vector3.new(0, 3, 0))
                 notify("✅ Teleported!", Color3.fromRGB(100, 255, 150))
             else
                 notify("❌ Character not found!", Color3.fromRGB(255, 100, 100))
@@ -278,13 +284,19 @@ local function enableClickTP()
 end
 
 local function disableClickTP()
-    if not clickTPData.enabled then return end
+    if not clickTPData.enabled then 
+        notify("⚠️ Click TP is already disabled", Color3.fromRGB(255, 200, 100))
+        return 
+    end
+    
     clickTPData.enabled = false
     
     if clickTPData.connection then
         clickTPData.connection:Disconnect()
         clickTPData.connection = nil
     end
+    
+    clickTPData.mouse = nil -- Clear mouse reference
     
     notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
 end
