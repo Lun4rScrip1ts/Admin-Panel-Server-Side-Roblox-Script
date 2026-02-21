@@ -552,105 +552,203 @@ end
 -- =============================================================
 -- VIEW SYSTEM
 -- =============================================================
+-- View / Spectate system (free-look around target + freeze own character)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Assuming you already have these (from your original script)
+-- local notify = your_notify_function
+-- local currentTheme, globalConfig, applyGlassEffect = ... (your UI helpers)
+
 local viewData = {
     enabled = false,
     target = nil,
-    originalCFrame = nil,
+    originalWalkSpeed = 16,
+    originalJumpPower = 50,
     originalCameraType = nil,
-    viewLabel = nil
+    originalCFrame = nil,
+    connection = nil,
+    viewGui = nil,
 }
 
-local function view(plr)
+local function freezeLocalCharacter(freeze)
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    if freeze then
+        viewData.originalWalkSpeed = humanoid.WalkSpeed
+        viewData.originalJumpPower = humanoid.JumpPower
+        
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+        
+        -- Optional: stop any movement input (helps in some games)
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- or .None, but Physics is usually safer
+    else
+        humanoid.WalkSpeed = viewData.originalWalkSpeed
+        humanoid.JumpPower = viewData.originalJumpPower
+    end
+end
+
+local function view(targetPlayer)
     if viewData.enabled then
         notify("⚠️ Already viewing someone! Use !unview first", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    if not plr or not plr.Character then
+    if not targetPlayer or not targetPlayer.Character then
         notify("❌ Player not found or has no character", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    local targetHRP = plr.Character:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then
-        notify("❌ Target has no HumanoidRootPart", Color3.fromRGB(255, 100, 100))
+    local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    
+    if not targetHRP or not targetHum or targetHum.Health <= 0 then
+        notify("❌ Target has no valid HumanoidRootPart or is dead", Color3.fromRGB(255, 100, 100))
         return
     end
     
+    -- Store original state
     viewData.enabled = true
-    viewData.target = plr
-    viewData.originalCFrame = workspace.CurrentCamera.CFrame
-    viewData.originalCameraType = workspace.CurrentCamera.CameraType
+    viewData.target = targetPlayer
+    viewData.originalCameraType = Camera.CameraType
+    viewData.originalCFrame = Camera.CFrame
     
+    -- Freeze local player
+    freezeLocalCharacter(true)
+    
+    -- Create top label
     local viewGui = Instance.new("ScreenGui")
-    viewGui.Name = "ViewGui"
+    viewGui.Name = "SpectateGui"
     viewGui.ResetOnSpawn = false
     viewGui.DisplayOrder = 999999
-    viewGui.Parent = client.PlayerGui
+    viewGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     
-    local viewLabel = Instance.new("TextLabel")
-    viewLabel.Size = UDim2.new(0, 300, 0, 40)
-    viewLabel.Position = UDim2.new(0.5, -150, 0, 20)
-    viewLabel.BackgroundColor3 = currentTheme.glass
-    viewLabel.Text = "Viewing: " .. plr.Name .. " (@" .. plr.DisplayName .. ")"
-    viewLabel.Font = Enum.Font.GothamBold
-    viewLabel.TextSize = 18
-    viewLabel.TextColor3 = globalConfig.textColor
-    viewLabel.TextTransparency = 0 -- SOLID
-    viewLabel.TextStrokeTransparency = 0.5
-    viewLabel.TextStrokeColor3 = Color3.new(0,0,0)
-    applyGlassEffect(viewLabel, globalConfig.uiTransparency, 0.4)
-    viewLabel.Parent = viewGui
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 340, 0, 38)
+    label.Position = UDim2.new(0.5, -170, 0, 15)
+    label.BackgroundTransparency = globalConfig.uiTransparency or 0.4
+    label.BackgroundColor3 = currentTheme.glass or Color3.fromRGB(30, 30, 50)
+    label.Text = "Spectating: " .. targetPlayer.Name .. "   (@" .. targetPlayer.DisplayName .. ")"
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 18
+    label.TextColor3 = globalConfig.textColor or Color3.fromRGB(220, 220, 255)
+    label.TextStrokeTransparency = 0.6
+    label.TextStrokeColor3 = Color3.new(0,0,0)
+    label.BorderSizePixel = 0
+    label.Parent = viewGui
     
-    viewData.viewLabel = viewGui
+    -- Optional glass/blur effect if your function exists
+    if applyGlassEffect then
+        applyGlassEffect(label, globalConfig.uiTransparency or 0.4, 0.4)
+    end
     
-    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    viewData.viewGui = viewGui
     
-    viewData.freezeConn = RunService.RenderStepped:Connect(function()
-        if not viewData.enabled or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
+    -- Set camera to follow target but allow free look
+    Camera.CameraType = Enum.CameraType.Scriptable
+    
+    viewData.connection = RunService.RenderStepped:Connect(function(delta)
+        if not viewData.enabled or not targetPlayer.Character or not targetPlayer.Character.Parent then
+            unview() -- auto cleanup if target disappears
             return
         end
         
-        local targetPos = plr.Character.HumanoidRootPart.Position
-        local currentCamCF = workspace.CurrentCamera.CFrame
+        local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            unview()
+            return
+        end
         
-        local offset = currentCamCF.Position - targetPos
-        workspace.CurrentCamera.CFrame = CFrame.new(targetPos + offset) * CFrame.Angles(0, 0, 0)
-        workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, targetPos)
+        -- Keep camera orbiting around the target
+        -- We preserve the current offset/direction, only force position to orbit target
+        local currentCF = Camera.CFrame
+        local currentPos = currentCF.Position
+        local lookAt = hrp.Position + Vector3.new(0, 2, 0) -- slightly above root for better view
+        
+        -- Calculate new position that maintains relative offset but centered on target
+        local offset = currentPos - (hrp.Position + Vector3.new(0, 2, 0))
+        local newPos = hrp.Position + Vector3.new(0, 2, 0) + offset
+        
+        -- Smoothly move to new position (prevents jitter)
+        Camera.CFrame = CFrame.new(newPos, lookAt)
     end)
     
-    notify("👁️ Now viewing " .. plr.Name .. " (Free look enabled)", Color3.fromRGB(100, 255, 100))
+    notify("👁️ Now spectating " .. targetPlayer.Name .. " (free look + character frozen)", Color3.fromRGB(100, 255, 100))
 end
 
 local function unview()
     if not viewData.enabled then
-        notify("⚠️ Not viewing anyone", Color3.fromRGB(255, 100, 100))
         return
     end
     
     viewData.enabled = false
     
-    if viewData.freezeConn then
-        viewData.freezeConn:Disconnect()
-        viewData.freezeConn = nil
+    -- Disconnect loop
+    if viewData.connection then
+        viewData.connection:Disconnect()
+        viewData.connection = nil
     end
     
-    if viewData.viewLabel then
-        viewData.viewLabel:Destroy()
-        viewData.viewLabel = nil
+    -- Destroy GUI
+    if viewData.viewGui then
+        viewData.viewGui:Destroy()
+        viewData.viewGui = nil
     end
     
-    workspace.CurrentCamera.CameraType = viewData.originalCameraType or Enum.CameraType.Custom
+    -- Restore camera
+    Camera.CameraType = viewData.originalCameraType or Enum.CameraType.Custom
     if viewData.originalCFrame then
-        workspace.CurrentCamera.CFrame = viewData.originalCFrame
+        Camera.CFrame = viewData.originalCFrame
     end
+    
+    -- Unfreeze local character
+    freezeLocalCharacter(false)
     
     viewData.target = nil
     viewData.originalCFrame = nil
     viewData.originalCameraType = nil
     
-    notify("✅ View stopped", Color3.fromRGB(255, 160, 60))
+    notify("✅ Stopped spectating", Color3.fromRGB(255, 160, 60))
 end
+
+-- Optional: simple cleanup if player leaves / character dies
+LocalPlayer.CharacterRemoving:Connect(function()
+    if viewData.enabled then
+        unview()
+    end
+end)
+
+-- Example how you might call it from chat (add this if you want !view username)
+--[[
+LocalPlayer.Chatted:Connect(function(msg)
+    local lower = msg:lower()
+    if lower:sub(1,5) == "!view" then
+        local name = msg:sub(7):trim()
+        if name == "" then return end
+        
+        local target = Players:FindFirstChild(name) or Players:FindFirstChild(name:match("^%s*(.-)%s*$"))
+        if target then
+            view(target)
+        else
+            notify("Player not found: " .. name, Color3.fromRGB(255,100,100))
+        end
+    elseif lower == "!unview" then
+        unview()
+    end
+end)
+--]]
+
+print("Spectate system loaded: view(player), unview()")
 
 -- =============================================================
 -- JOIN LOGS PANEL
