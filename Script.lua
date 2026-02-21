@@ -3021,13 +3021,15 @@ function processCmd(msg)
     
     notify(prefix .. cmd, Color3.fromRGB(180, 180, 255))
     local target = getPlr(args[1] or "me")
-    
+   
+	elseif cmd == "!clicktp" then
+    enableClickTP()
+	elseif cmd == "!unclicktp" then
+    	disableClickTP()
     if cmd == "aimbot" then 
         createAimbotPanel()
     elseif cmd == "bring" then 
         bring(target)
-    elseif cmd == "clicktp" then 
-        clickTP()
     elseif cmd == "cmdbar" then
         toggleCmdBar()
     elseif cmd == "console" then 
@@ -3329,6 +3331,7 @@ local commandDescriptions = {
     ["!waypoint"] = "Creates waypoint at current position",
     ["!fov [1-120]"] = "Sets camera field of view",
     ["!kick [plr]"] = "Kicks player from game"
+	["!unclicktp"] = "Disables ClickTP"
 }
 
 -- Alphabetical command list
