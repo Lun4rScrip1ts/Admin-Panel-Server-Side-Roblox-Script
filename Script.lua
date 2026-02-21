@@ -1,3 +1,105 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local spinData = {}
+
+function spin(plr, speed)
+
+	speed = tonumber(speed) or 20
+	speed = math.clamp(speed, 1, 10000)
+
+	local char = plr.Character
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hrp or not hum then return end
+
+	-- Stop old spin
+	if spinData[plr] then
+		unspin(plr)
+	end
+
+	hum.AutoRotate = false
+
+	-- Attachment (YOU ALREADY HAD THIS)
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SpinAttachment"
+	attachment.Parent = hrp
+
+	-- REAL SPIN MOTOR (replaces AlignOrientation only)
+	local angular = Instance.new("AngularVelocity")
+	angular.Name = "SpinVelocity"
+	angular.Attachment0 = attachment
+	angular.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	angular.MaxTorque = math.huge
+
+	-- the actual speed you type
+	angular.AngularVelocity = Vector3.new(0, speed, 0)
+
+	angular.Parent = hrp
+
+	spinData[plr] = {
+		attachment = attachment,
+		angular = angular,
+		connection = nil
+	}
+
+	-- keep server ownership so Roblox doesn't override it
+	spinData[plr].connection = RunService.Stepped:Connect(function()
+		if hrp and hrp.Parent then
+			pcall(function()
+				hrp:SetNetworkOwner(nil)
+			end)
+		end
+	end)
+end
+
+
+function unspin(plr)
+
+	local data = spinData[plr]
+	if not data then return end
+
+	if data.connection then
+		data.connection:Disconnect()
+	end
+
+	if data.angular then
+		data.angular:Destroy()
+	end
+
+	if data.attachment then
+		data.attachment:Destroy()
+	end
+
+	local char = plr.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.AutoRotate = true
+		end
+	end
+
+	spinData[plr] = nil
+end
+
+
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		unspin(plr)
+	end)
+end)
+
+
+
+
+
+
+
+
+
+
 -- Join my Discord :3 https://discord.gg/5GeQAXYYcW   
 -- Created by @LunarRbxZ
 -- Fixed and Enhanced Admin Script
