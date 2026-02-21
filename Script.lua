@@ -1,105 +1,3 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local spinData = {}
-
-function spin(plr, speed)
-
-	speed = tonumber(speed) or 20
-	speed = math.clamp(speed, 1, 10000)
-
-	local char = plr.Character
-	if not char then return end
-
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hrp or not hum then return end
-
-	-- Stop old spin
-	if spinData[plr] then
-		unspin(plr)
-	end
-
-	hum.AutoRotate = false
-
-	-- Attachment (YOU ALREADY HAD THIS)
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "SpinAttachment"
-	attachment.Parent = hrp
-
-	-- REAL SPIN MOTOR (replaces AlignOrientation only)
-	local angular = Instance.new("AngularVelocity")
-	angular.Name = "SpinVelocity"
-	angular.Attachment0 = attachment
-	angular.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
-	angular.MaxTorque = math.huge
-
-	-- the actual speed you type
-	angular.AngularVelocity = Vector3.new(0, speed, 0)
-
-	angular.Parent = hrp
-
-	spinData[plr] = {
-		attachment = attachment,
-		angular = angular,
-		connection = nil
-	}
-
-	-- keep server ownership so Roblox doesn't override it
-	spinData[plr].connection = RunService.Stepped:Connect(function()
-		if hrp and hrp.Parent then
-			pcall(function()
-				hrp:SetNetworkOwner(nil)
-			end)
-		end
-	end)
-end
-
-
-function unspin(plr)
-
-	local data = spinData[plr]
-	if not data then return end
-
-	if data.connection then
-		data.connection:Disconnect()
-	end
-
-	if data.angular then
-		data.angular:Destroy()
-	end
-
-	if data.attachment then
-		data.attachment:Destroy()
-	end
-
-	local char = plr.Character
-	if char then
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum.AutoRotate = true
-		end
-	end
-
-	spinData[plr] = nil
-end
-
-
-Players.PlayerAdded:Connect(function(plr)
-	plr.CharacterAdded:Connect(function()
-		unspin(plr)
-	end)
-end)
-
-
-
-
-
-
-
-
-
-
 -- Join my Discord :3 https://discord.gg/5GeQAXYYcW   
 -- Created by @LunarRbxZ
 -- Fixed and Enhanced Admin Script
@@ -352,56 +250,7 @@ local function notify(text, col)
         task.delay(0.6, function() f:Destroy() end)
     end)
 end
--- =============================================================
--- CLICK TP SYSTEM
--- =============================================================
-local clickTPData = {
-    enabled = false,
-    connection = nil,
-    mouse = nil -- Store mouse reference here too
-}
 
-local function enableClickTP()
-    if clickTPData.enabled then 
-        notify("⚠️ Click TP is already enabled", Color3.fromRGB(255, 200, 100))
-        return 
-    end
-    
-    clickTPData.enabled = true
-    clickTPData.mouse = client:GetMouse() -- Get fresh mouse reference
-    
-    clickTPData.connection = clickTPData.mouse.Button2Down:Connect(function()
-        if clickTPData.mouse.Target then
-            local hrp = getHRP(client)
-            if hrp then
-                hrp.CFrame = CFrame.new(clickTPData.mouse.Hit.Position + Vector3.new(0, 3, 0))
-                notify("✅ Teleported!", Color3.fromRGB(100, 255, 150))
-            else
-                notify("❌ Character not found!", Color3.fromRGB(255, 100, 100))
-            end
-        end
-    end)
-    
-    notify("✅ Click TP enabled - RIGHT CLICK anywhere to teleport", Color3.fromRGB(100, 255, 120))
-end
-
-local function disableClickTP()
-    if not clickTPData.enabled then 
-        notify("⚠️ Click TP is already disabled", Color3.fromRGB(255, 200, 100))
-        return 
-    end
-    
-    clickTPData.enabled = false
-    
-    if clickTPData.connection then
-        clickTPData.connection:Disconnect()
-        clickTPData.connection = nil
-    end
-    
-    clickTPData.mouse = nil -- Clear mouse reference
-    
-    notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
-end
 -- =============================================================
 -- FIXED FLY SYSTEM
 -- =============================================================
@@ -1405,6 +1254,7 @@ Players.PlayerAdded:Connect(function(plr)
 		unspin(plr)
 	end)
 end)
+
 -- =============================================================
 -- LEAVE COMMAND
 -- =============================================================
@@ -2790,7 +2640,6 @@ local function ping()
     notify("📶 Ping: " .. ping .. "ms", color)
 end
 
-
 local clickTPconn
 local function clickTP()
     if clickTPconn then
@@ -3135,15 +2984,13 @@ function processCmd(msg)
     
     notify(prefix .. cmd, Color3.fromRGB(180, 180, 255))
     local target = getPlr(args[1] or "me")
-   
-	elseif cmd == "!clicktp" then
-    enableClickTP()
-	elseif cmd == "!unclicktp" then
-    	disableClickTP()
+    
     if cmd == "aimbot" then 
         createAimbotPanel()
     elseif cmd == "bring" then 
         bring(target)
+    elseif cmd == "clicktp" then 
+        clickTP()
     elseif cmd == "cmdbar" then
         toggleCmdBar()
     elseif cmd == "console" then 
@@ -3445,7 +3292,6 @@ local commandDescriptions = {
     ["!waypoint"] = "Creates waypoint at current position",
     ["!fov [1-120]"] = "Sets camera field of view",
     ["!kick [plr]"] = "Kicks player from game"
-	["!unclicktp"] = "Disables ClickTP"
 }
 
 -- Alphabetical command list
