@@ -2639,27 +2639,23 @@ local function ping()
     notify("📶 Ping: " .. ping .. "ms", color)
 end
 
--- Fixed Click TP Toggle for exploit/admin (MUST run client-side!)
--- Execute this snippet directly in your executor when in-game.
-
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local mouse = player:GetMouse()
-
+local client = game:GetService("Players").LocalPlayer
+local Mouse = client:GetMouse()
 local clickTPconn
 
-local function notify(msg, color)
-    -- If your admin has a custom notify, replace this line with it
-    -- Example fallbacks:
-    -- game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Click TP", Text = msg, Duration = 5})
-    print(msg)  -- at least prints to console/output
+-- Helper function to get HumanoidRootPart
+local function getHRP(player)
+    local char = player.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    return nil
 end
 
-local function getHRP(plr)
-    if not plr or not plr.Character then return nil end
-    return plr.Character:FindFirstChild("HumanoidRootPart") 
-        or plr.Character:FindFirstChild("Torso")
-        or plr.Character.PrimaryPart
+-- Simple notify function (replace with your own if you have one)
+local function notify(text, color)
+    print(text) -- Fallback if you don't have a notify system
+    -- If you have a custom notify function, use that instead
 end
 
 local function clickTP()
@@ -2668,39 +2664,24 @@ local function clickTP()
         clickTPconn = nil
         notify("✅ Click TP disabled", Color3.fromRGB(255, 120, 100))
     else
-        clickTPconn = mouse.Button1Down:Connect(function()
-            if mouse.Target then
-                local hrp = getHRP(player)  -- fixed: use player (LocalPlayer), not undefined 'client'
+        -- Use Button2Down for RIGHT CLICK (Button1Down is left click)
+        clickTPconn = Mouse.Button2Down:Connect(function()
+            if Mouse.Target then
+                local hrp = getHRP(client)
                 if hrp then
-                    hrp.CFrame = mouse.Hit + Vector3.new(0, 3, 0)
+                    -- Teleport 3 studs above the clicked point
+                    hrp.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
                 else
-                    print("No HRP found - character not loaded?")
+                    notify("❌ Character not found!", Color3.fromRGB(255, 100, 100))
                 end
             end
         end)
-        notify("✅ Click TP enabled - click anywhere to teleport", Color3.fromRGB(100, 255, 120))
+        notify("✅ Click TP enabled - RIGHT CLICK anywhere to teleport", Color3.fromRGB(100, 255, 120))
     end
 end
 
--- Trigger it somehow — pick ONE:
-
--- A) Immediate toggle (easiest for testing)
+-- Run it
 clickTP()
-
--- B) Keybind (press RightShift to toggle, change as needed)
---[[
-local UIS = game:GetService("UserInputService")
-UIS.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        clickTP()
-    end
-end)
-print("Press RightShift to toggle Click TP")
---]]
-
--- C) If your admin has chat commands — add to its handler:
--- if args[1] == "clicktp" or args[1] == "ctp" then clickTP() end
 
 local function setFov(val)
     local num = tonumber(val)
