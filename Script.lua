@@ -2927,21 +2927,88 @@ local function explode(plr)
     notify("💥 Exploded! Limbs detached & scattered", Color3.fromRGB(255, 60, 60))
 end
 
-local function giant(plr)
-    if plr ~= client then
-        notify("❌ Giant only works on yourself", Color3.fromRGB(255, 100, 100))
-        return
+-- Fixed Giant Mode (Local only - you look huge to yourself, others see normal)
+-- Works on R15 avatars (most in 2026). Rthro/classic avatars may vary slightly.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local client = Players.LocalPlayer  -- assuming 'client' is LocalPlayer in your script
+
+local function getHum(plr)
+    local char = plr.Character
+    if char then
+        return char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
     end
-    local hum = getHum(plr)
-    if hum then
-        for _, scaleName in ipairs({"BodyDepthScale", "BodyHeightScale", "BodyWidthScale", "HeadScale"}) do
-            local scale = hum:FindFirstChild(scaleName)
-            if scale then scale.Value = 3 end
-        end
-        notify("🦕 Giant mode!", Color3.fromRGB(100, 255, 100))
-    end
+    return nil
 end
 
+local function giant(plr, scaleMultiplier)
+    if plr ~= client then
+        notify("❌ Giant only works on yourself (local visual only)", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    local hum = getHum(plr)
+    if not hum then
+        notify("❌ No Humanoid found - try respawning", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    -- Default multiplier if not provided (3x is very big, 5x is massive)
+    scaleMultiplier = scaleMultiplier or 3
+    
+    -- The core scales (create if missing - rare but happens on some avatars)
+    local scales = {
+        "BodyDepthScale",
+        "BodyHeightScale",
+        "BodyWidthScale",
+        "HeadScale",
+        "BodyProportionScale",  -- helps with proportions
+        "BodyTypeScale"         -- newer, for Rthro/classic balance
+    }
+    
+    for _, name in ipairs(scales) do
+        local val = hum:FindFirstChild(name)
+        if not val then
+            val = Instance.new("NumberValue")
+            val.Name = name
+            val.Value = 1  -- default
+            val.Parent = hum
+        end
+        -- Multiply current value (preserves custom avatar scales)
+        val.Value = val.Value * scaleMultiplier
+    end
+    
+    -- Extra: Make hip height higher so you don't sink into floor
+    hum.HipHeight = hum.HipHeight * scaleMultiplier
+    
+    -- Optional: Slightly enlarge root part (helps collision feel bigger locally)
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.Size = root.Size * scaleMultiplier  -- local only
+    end
+    
+    -- Wait a frame for changes to apply (fixes some visual delay)
+    RunService.Heartbeat:Wait()
+    
+    notify("🦕 Giant mode activated! (" .. tostring(scaleMultiplier) .. "x)", Color3.fromRGB(100, 255, 100))
+end
+
+-- Example usage / command trigger (add to your chat system)
+-- !giant or !giant 5 for 5x size
+-- 
+-- client.Chatted:Connect(function(msg)
+--     local lower = msg:lower()
+--     if lower == "!giant" then
+--         giant(client)
+--     elseif lower:match("^!giant%s+(%d+)") then
+--         local num = tonumber(lower:match("^!giant%s+(%d+)"))
+--         if num and num >= 1 and num <= 20 then  -- cap to prevent crash
+--             giant(client, num)
+--         end
+--     end
+-- end)
 local function tiny(plr)
     if plr ~= client then
         notify("❌ Tiny only works on yourself", Color3.fromRGB(255, 100, 100))
