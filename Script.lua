@@ -2927,88 +2927,84 @@ local function explode(plr)
     notify("💥 Exploded! Limbs detached & scattered", Color3.fromRGB(255, 60, 60))
 end
 
--- Fixed Giant Mode (Local only - you look huge to yourself, others see normal)
--- Works on R15 avatars (most in 2026). Rthro/classic avatars may vary slightly.
+-- Float Higher (increased HipHeight - you walk/jump normally, just elevated)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local client = Players.LocalPlayer  -- assuming 'client' is LocalPlayer in your script
+local client = Players.LocalPlayer  -- your LocalPlayer
 
-local function getHum(plr)
-    local char = plr.Character
-    if char then
-        return char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
-    end
-    return nil
+local currentExtraHeight = 0  -- tracks how much extra height we added
+local connection = nil        -- for smooth updating if needed
+
+local function setHeight(extraHeight)
+    local char = client.Character
+    if not char then return false end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    
+    if not hum or not root then return false end
+    
+    -- Safety: don't go insanely high (prevents glitching through ceilings or falling forever)
+    extraHeight = math.clamp(extraHeight, 0, 15)  -- max ~15 studs up feels reasonable
+    
+    -- Apply the height
+    hum.HipHeight = hum.HipHeight + extraHeight - currentExtraHeight
+    
+    -- Optional: tiny offset to RootPart to match exactly (helps with some animations)
+    -- root.CFrame = root.CFrame + Vector3.new(0, extraHeight - currentExtraHeight, 0)
+    
+    currentExtraHeight = extraHeight
+    
+    notify("🌙 Floating " .. tostring(extraHeight) .. " studs higher! (normal movement kept)", Color3.fromRGB(120, 200, 255))
+    return true
 end
 
-local function giant(plr, scaleMultiplier)
-    if plr ~= client then
-        notify("❌ Giant only works on yourself (local visual only)", Color3.fromRGB(255, 100, 100))
-        return
+-- Main command function (call this when you want to change height)
+local function floatHigher(amount)
+    amount = amount or 4  -- default: 4 studs up (feels nice, not too high)
+    
+    if setHeight(amount) then
+        -- Optional: smooth transition if you want it animated
+        -- (uncomment if you like a slow rise/fall)
+        --[[
+        if connection then connection:Disconnect() end
+        connection = RunService.Heartbeat:Connect(function()
+            -- lerp or something if you want animation
+        end)
+        --]]
+    else
+        notify("❌ Couldn't apply height - respawn or wait for character", Color3.fromRGB(255, 100, 100))
     end
-    
-    local hum = getHum(plr)
-    if not hum then
-        notify("❌ No Humanoid found - try respawning", Color3.fromRGB(255, 100, 100))
-        return
-    end
-    
-    -- Default multiplier if not provided (3x is very big, 5x is massive)
-    scaleMultiplier = scaleMultiplier or 3
-    
-    -- The core scales (create if missing - rare but happens on some avatars)
-    local scales = {
-        "BodyDepthScale",
-        "BodyHeightScale",
-        "BodyWidthScale",
-        "HeadScale",
-        "BodyProportionScale",  -- helps with proportions
-        "BodyTypeScale"         -- newer, for Rthro/classic balance
-    }
-    
-    for _, name in ipairs(scales) do
-        local val = hum:FindFirstChild(name)
-        if not val then
-            val = Instance.new("NumberValue")
-            val.Name = name
-            val.Value = 1  -- default
-            val.Parent = hum
-        end
-        -- Multiply current value (preserves custom avatar scales)
-        val.Value = val.Value * scaleMultiplier
-    end
-    
-    -- Extra: Make hip height higher so you don't sink into floor
-    hum.HipHeight = hum.HipHeight * scaleMultiplier
-    
-    -- Optional: Slightly enlarge root part (helps collision feel bigger locally)
-    local root = plr.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.Size = root.Size * scaleMultiplier  -- local only
-    end
-    
-    -- Wait a frame for changes to apply (fixes some visual delay)
-    RunService.Heartbeat:Wait()
-    
-    notify("🦕 Giant mode activated! (" .. tostring(scaleMultiplier) .. "x)", Color3.fromRGB(100, 255, 100))
 end
 
--- Example usage / command trigger (add to your chat system)
--- !giant or !giant 5 for 5x size
--- 
--- client.Chatted:Connect(function(msg)
---     local lower = msg:lower()
---     if lower == "!giant" then
---         giant(client)
---     elseif lower:match("^!giant%s+(%d+)") then
---         local num = tonumber(lower:match("^!giant%s+(%d+)"))
---         if num and num >= 1 and num <= 20 then  -- cap to prevent crash
---             giant(client, num)
---         end
---     end
--- end)
+-- Optional: reset back to normal
+local function resetHeight()
+    setHeight(0)
+    notify("✅ Back to normal ground level", Color3.fromRGB(100, 255, 100))
+end
+
+-- Example: how to trigger it (add to your chat command system)
+-- !float 6    → float 6 studs up
+-- !float      → default 4 studs
+-- !ground     → reset
+
+-- Example chat listener (paste this where your commands are handled)
+--[[
+client.Chatted:Connect(function(msg)
+    local lower = msg:lower()
+    if lower:match("^!float%s*(%d*)") then
+        local num = tonumber(lower:match("^!float%s*(%d+)")) or 4
+        floatHigher(num)
+    elseif lower == "!ground" or lower == "!resetheight" then
+        resetHeight()
+    end
+end)
+--]]
+
+print("Height float loaded! Use !float [number] or !ground")
+
 local function tiny(plr)
     if plr ~= client then
         notify("❌ Tiny only works on yourself", Color3.fromRGB(255, 100, 100))
