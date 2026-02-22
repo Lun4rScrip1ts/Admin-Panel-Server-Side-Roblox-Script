@@ -147,7 +147,7 @@ local currentTheme = themes.Default
 -- =============================================================
 local function playOpen()
     local s = Instance.new("Sound")
-    s.SoundId = "rbxassetid://1847661826"
+    s.SoundId = "rbxassetid://124233495227925"
     s.Volume = 0.45
     s.Parent = SoundService
     s:Play()
