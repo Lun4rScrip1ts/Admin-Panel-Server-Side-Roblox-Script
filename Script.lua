@@ -552,7 +552,8 @@ end
 -- =============================================================
 -- VIEW SYSTEM
 -- =============================================================
--- IMPROVED SPECTATE SYSTEM (Free mouse look like you're playing as them + no floor glitch on unview)
+-- IMPROVED SPECTATE: Full free-look like you're playing as them (mouse look, zoom, etc.)
+-- No locked angle, no floor glitch on exit
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -560,8 +561,9 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Your existing variables (keep these)
--- notify(), currentTheme, globalConfig, applyGlassEffect, client
+-- Keep your existing notify(), themes, etc.
+-- local notify = ...
+-- local currentTheme, globalConfig, applyGlassEffect, client = ...
 
 local viewData = {
     enabled = false,
@@ -572,31 +574,35 @@ local viewData = {
     originalJumpPower = 50,
     originalPlatformStand = false,
     viewGui = nil,
-    -- No more connection needed!
 }
 
 local function freezeLocalCharacter(freeze)
     local char = LocalPlayer.Character
     if not char then return end
+    
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
     
     if freeze then
-        viewData.originalWalkSpeed = hum.WalkSpeed
-        viewData.originalJumpPower = hum.JumpPower
+        viewData.originalWalkSpeed     = hum.WalkSpeed
+        viewData.originalJumpPower     = hum.JumpPower
         viewData.originalPlatformStand = hum.PlatformStand
         
-        hum.WalkSpeed = 0
-        hum.JumpPower = 0
-        hum.PlatformStand = true          -- This prevents sliding/falling glitches
+        hum.WalkSpeed     = 0
+        hum.JumpPower     = 0
+        hum.PlatformStand = true  -- Prevents falling/sliding while frozen
     else
-        hum.WalkSpeed = viewData.originalWalkSpeed
-        hum.JumpPower = viewData.originalJumpPower
+        hum.WalkSpeed     = viewData.originalWalkSpeed
+        hum.JumpPower     = viewData.originalJumpPower
         hum.PlatformStand = viewData.originalPlatformStand
         
-        -- Force clean state so you don't glitch on the floor
-        task.wait(0.05)
-        hum:ChangeState(Enum.HumanoidStateType.Running)
+        -- Tiny delay + force clean state to fix floor glue / falling glitch
+        task.delay(0.03, function()
+            if hum and hum.Parent then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+                -- Optional extra: hum:ChangeState(Enum.HumanoidStateType.GettingUp) if ragdolled
+            end
+        end)
     end
 end
 
@@ -612,55 +618,55 @@ local function view(targetPlayer)
     end
     
     local targetHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-    local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    
-    if not targetHum or not targetHRP or targetHum.Health <= 0 then
+    if not targetHum or targetHum.Health <= 0 then
         notify("❌ Target is dead or has no Humanoid", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    -- Store original camera settings
-    viewData.enabled = true
-    viewData.target = targetPlayer
+    -- Store originals
+    viewData.enabled          = true
+    viewData.target           = targetPlayer
     viewData.originalCameraSubject = Camera.CameraSubject
-    viewData.originalCameraType = Camera.CameraType
+    viewData.originalCameraType    = Camera.CameraType
     
-    -- Freeze YOU
+    -- Freeze your own character
     freezeLocalCharacter(true)
     
-    -- === THE MAGIC PART ===
-    -- This makes it feel exactly like you are the other player (full free mouse look)
+    -- TRANSFER CAMERA CONTROL → feels like you're them
     Camera.CameraSubject = targetHum
-    Camera.CameraType = Enum.CameraType.Custom
+    Camera.CameraType    = Enum.CameraType.Custom   -- This allows full mouse look / zoom
     
-    -- Create the nice viewing label
+    -- Optional: start in third person if you want consistent view
+    -- targetHum.CameraOffset = Vector3.new(0, 2, 0)  -- tweak if needed
+    
+    -- Top label
     local viewGui = Instance.new("ScreenGui")
     viewGui.Name = "SpectateGui"
     viewGui.ResetOnSpawn = false
     viewGui.DisplayOrder = 999999
-    viewGui.Parent = client.PlayerGui   -- or LocalPlayer.PlayerGui
+    viewGui.Parent = client.PlayerGui  -- or LocalPlayer.PlayerGui
     
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 340, 0, 38)
-    label.Position = UDim2.new(0.5, -170, 0, 15)
-    label.BackgroundTransparency = globalConfig.uiTransparency or 0.4
-    label.BackgroundColor3 = currentTheme.glass or Color3.fromRGB(30, 30, 50)
-    label.Text = "👁️ Spectating: " .. targetPlayer.Name .. "   (@" .. targetPlayer.DisplayName .. ")"
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 18
-    label.TextColor3 = globalConfig.textColor or Color3.fromRGB(220, 220, 255)
-    label.TextStrokeTransparency = 0.6
+    label.Size           = UDim2.new(0, 360, 0, 40)
+    label.Position       = UDim2.new(0.5, -180, 0, 10)
+    label.BackgroundTransparency = globalConfig.uiTransparency or 0.45
+    label.BackgroundColor3 = currentTheme.glass or Color3.fromRGB(20, 20, 40)
+    label.Text           = "👁️  Spectating: " .. targetPlayer.Name .. "  (@" .. targetPlayer.DisplayName .. ")  — Use mouse to look around"
+    label.Font           = Enum.Font.GothamBold
+    label.TextSize       = 18
+    label.TextColor3     = globalConfig.textColor or Color3.fromRGB(230, 230, 255)
+    label.TextStrokeTransparency = 0.7
     label.TextStrokeColor3 = Color3.new(0,0,0)
     label.BorderSizePixel = 0
     label.Parent = viewGui
     
     if applyGlassEffect then
-        applyGlassEffect(label, globalConfig.uiTransparency or 0.4, 0.4)
+        applyGlassEffect(label, globalConfig.uiTransparency or 0.45, 0.35)
     end
     
     viewData.viewGui = viewGui
     
-    notify("👁️ Now spectating " .. targetPlayer.Name .. " (you can look around freely)", Color3.fromRGB(100, 255, 100))
+    notify("👁️ Now viewing " .. targetPlayer.Name .. " — full free look like you're them", Color3.fromRGB(100, 255, 100))
 end
 
 local function unview()
@@ -671,45 +677,40 @@ local function unview()
     
     viewData.enabled = false
     
-    -- Restore camera FIRST (this fixes the floor glitch)
-    if viewData.originalCameraSubject then
-        Camera.CameraSubject = viewData.originalCameraSubject
-    else
-        Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    end
+    -- Restore camera **before** unfreezing (prevents glitches)
+    Camera.CameraSubject = viewData.originalCameraSubject or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid"))
+    Camera.CameraType    = viewData.originalCameraType or Enum.CameraType.Custom
     
-    Camera.CameraType = viewData.originalCameraType or Enum.CameraType.Custom
-    
-    -- Unfreeze YOU
+    -- Unfreeze
     freezeLocalCharacter(false)
     
-    -- Destroy label
+    -- Clean up GUI
     if viewData.viewGui then
         viewData.viewGui:Destroy()
         viewData.viewGui = nil
     end
     
-    -- Cleanup
     viewData.target = nil
     viewData.originalCameraSubject = nil
     viewData.originalCameraType = nil
     
-    notify("✅ Stopped spectating - welcome back", Color3.fromRGB(255, 160, 60))
+    notify("✅ Stopped spectating — back to normal", Color3.fromRGB(255, 160, 60))
 end
 
--- Auto cleanup if target dies or leaves
-LocalPlayer.CharacterRemoving:Connect(function()
-    if viewData.enabled then unview() end
-end)
-
--- Optional: auto stop if target character is removed
-game:GetService("Players").PlayerRemoving:Connect(function(plr)
+-- Auto-stop if target disappears/dies/leaves
+Players.PlayerRemoving:Connect(function(plr)
     if viewData.target == plr and viewData.enabled then
         unview()
     end
 end)
 
-print("✅ Improved Spectate loaded! (Free mouse look + no floor glitch)")
+LocalPlayer.CharacterRemoving:Connect(function()
+    if viewData.enabled then
+        unview()
+    end
+end)
+
+print("Spectate system ready: full free camera control like playing as them + glitch fix")
 
 -- =============================================================
 -- JOIN LOGS PANEL
