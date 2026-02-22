@@ -2846,16 +2846,31 @@ local function trip(plr)
 end
 
 local function explode(plr)
-    local hrp = getHRP(plr)
-    if hrp then
-        local ex = Instance.new("Explosion")
-        ex.Position = hrp.Position
-        ex.BlastPressure = 0
-        ex.Parent = workspace
-        notify("💥 Exploded!", Color3.fromRGB(255, 80, 80))
-    else
+    local char = plr.Character
+    if not char then
         notify("❌ Cannot explode - no character", Color3.fromRGB(255, 100, 100))
+        return
     end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    
+    if not hrp or not hum or hum.Health <= 0 then
+        notify("❌ Cannot explode - invalid target", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    -- Create REAL explosion with damage + effects
+    local ex = Instance.new("Explosion")
+    ex.Position = hrp.Position
+    ex.BlastRadius = 100      -- Big visible blast
+    ex.BlastPressure = 1000000  -- MAX damage (even in FE, affects local + visual)
+    ex.Parent = workspace
+    
+    -- FORCE death (bypasses most protections for LocalPlayer)
+    hum.Health = 0
+    
+    notify("💥 BOOM! Exploded & died 💀", Color3.fromRGB(255, 80, 80))
 end
 
 local function giant(plr)
