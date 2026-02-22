@@ -2845,32 +2845,86 @@ local function trip(plr)
     end
 end
 
+-- Improved explode() that ragdolls + detaches limbs visibly (server-side visible in most games)
+-- This makes your character "explode" by breaking joints/connections and scattering parts
+-- Works in many games where you can manipulate your own character locally (FE-friendly visual death)
+
 local function explode(plr)
     local char = plr.Character
     if not char then
-        notify("❌ Cannot explode - no character", Color3.fromRGB(255, 100, 100))
+        notify("❌ No character found", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
     
-    if not hrp or not hum or hum.Health <= 0 then
-        notify("❌ Cannot explode - invalid target", Color3.fromRGB(255, 100, 100))
+    if not humanoid or not root or humanoid.Health <= 0 then
+        notify("❌ Cannot explode - invalid or already dead", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    -- Create REAL explosion with damage + effects
-    local ex = Instance.new("Explosion")
-    ex.Position = hrp.Position
-    ex.BlastRadius = 100      -- Big visible blast
-    ex.BlastPressure = 1000000  -- MAX damage (even in FE, affects local + visual)
-    ex.Parent = workspace
+    -- Step 1: Create a big visible explosion for everyone
+    local explosion = Instance.new("Explosion")
+    explosion.Position = root.Position
+    explosion.BlastRadius = 12           -- decent size
+    explosion.BlastPressure = 500000     -- strong visual push
+    explosion.DestroyJointRadiusPercent = 0  -- don't auto-break joints (we do it manually)
+    explosion.Parent = workspace
     
-    -- FORCE death (bypasses most protections for LocalPlayer)
-    hum.Health = 0
+    -- Step 2: Force death + ragdoll (kills you and makes physics take over)
+    humanoid.Health = 0
+    humanoid:ChangeState(Enum.HumanoidStateType.Dead)
     
-    notify("💥 BOOM! Exploded & died 💀", Color3.fromRGB(255, 80, 80))
+    -- Step 3: Detach limbs visibly (breaks Motor6D joints → parts fly apart)
+    -- This is what makes limbs scatter like an explosion
+    for _, motor in ipairs(char:GetDescendants()) do
+        if motor:IsA("Motor6D") and motor.Part1 and motor.Part0 then
+            -- Create a BallSocketConstraint or just break the joint
+            -- Option A: Simple break (most games let this replicate)
+            motor.Enabled = false
+            
+            -- Option B: Replace with BallSocket + NoCollision for flying parts (more dramatic)
+            local socket = Instance.new("BallSocketConstraint")
+            socket.Attachment0 = Instance.new("Attachment", motor.Part0)
+            socket.Attachment1 = Instance.new("Attachment", motor.Part1)
+            socket.LimitsEnabled = false
+            socket.Parent = motor.Part0
+            
+            -- Optional: Give random velocity to make limbs fly farther
+            if motor.Part1:IsA("BasePart") then
+                motor.Part1.Velocity = Vector3.new(
+                    math.random(-80,80),
+                    math.random(60,140),
+                    math.random(-80,80)
+                )
+                motor.Part1.RotVelocity = Vector3.new(
+                    math.random(-10,10),
+                    math.random(-10,10),
+                    math.random(-10,10)
+                )
+            end
+        end
+    end
+    
+    -- Step 4: Extra ragdoll physics boost (makes body flop/scatter more)
+    if root then
+        root.Velocity = Vector3.new(0, 80, 0)  -- upward kick
+        root.AssemblyLinearVelocity = Vector3.new(
+            math.random(-60,60),
+            math.random(40,100),
+            math.random(-60,60)
+        )
+    end
+    
+    -- Optional: Hide head or make dramatic (some games detect head removal)
+    local head = char:FindFirstChild("Head")
+    if head then
+        head.Transparency = 0.3  -- slight fade or leave visible
+        head.Velocity = Vector3.new(math.random(-50,50), 100, math.random(-50,50))
+    end
+    
+    notify("💥 Exploded! Limbs detached & scattered", Color3.fromRGB(255, 60, 60))
 end
 
 local function giant(plr)
