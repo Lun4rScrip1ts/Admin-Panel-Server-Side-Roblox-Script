@@ -2954,11 +2954,51 @@ local function unfire(plr)
     end
 end
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local client = Players.LocalPlayer  -- assuming 'client' is LocalPlayer in your script
+
 local function thirdp()
+    -- Step 1: Switch to Classic mode (allows zooming)
     client.CameraMode = Enum.CameraMode.Classic
+    
+    -- Step 2: Temporarily force a zoom-out to exit first person reliably
+    -- (Roblox camera won't exit FP just by setting Classic if already zoomed in)
+    local originalMinZoom = client.CameraMinZoomDistance
+    client.CameraMinZoomDistance = 10  -- or higher, forces zoom out
     client.CameraMaxZoomDistance = 400
-    client.CameraMinZoomDistance = 0.5
-    notify("✅ Third person enabled", currentTheme.accent)
+    
+    -- Wait one frame so the camera module processes the change and zooms out
+    RunService.RenderStepped:Wait()  -- or task.wait(0.03) if you prefer
+    
+    -- Step 3: Restore normal min zoom (so player can zoom in again if they want)
+    client.CameraMinZoomDistance = originalMinZoom  -- or set to 0.5 if you want tight zoom allowed
+    
+    -- Step 4: Fix "invisible to self" glitch
+    -- Roblox sets LocalTransparencyModifier = 1 on parts in FP; doesn't always reset
+    local character = client.Character
+    if character then
+        for _, obj in ipairs(character:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Decal") or obj:IsA("Texture") then
+                obj.LocalTransparencyModifier = 0
+            end
+        end
+        
+        -- Optional: If head/face is still hidden, force it visible too
+        local head = character:FindFirstChild("Head")
+        if head then
+            head.LocalTransparencyModifier = 0
+        end
+    end
+    
+    -- Optional: Re-focus camera on your humanoid to snap back cleanly
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        workspace.CurrentCamera.CameraSubject = humanoid
+    end
+    
+    notify("✅ Third person enabled (forced zoom out + visibility fix)", currentTheme.accent)
 end
 
 local function firstp()
