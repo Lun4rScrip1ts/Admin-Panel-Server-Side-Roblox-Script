@@ -3117,16 +3117,15 @@ end
 -- advanced tracers
 ------------------------------------------------
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
-local tracerData = {
+local tracerSystem = {
     enabled = false,
     players = {},
     connections = {}
 }
 
 ----------------------------------------------------
--- SAFE HRP GETTER
+-- GET YOUR HRP
 ----------------------------------------------------
 local function getMyHRP()
     if client.Character then
@@ -3136,10 +3135,25 @@ local function getMyHRP()
 end
 
 ----------------------------------------------------
+-- TEAM COLOR LOGIC
+----------------------------------------------------
+local function getTracerColor(plr)
+    if not client.Team or not plr.Team then
+        return Color3.new(1,1,1) -- white if no team
+    end
+
+    if plr.Team == client.Team then
+        return Color3.fromRGB(0,255,0) -- friendly
+    else
+        return Color3.fromRGB(255,0,0) -- enemy
+    end
+end
+
+----------------------------------------------------
 -- CLEAR ONE PLAYER TRACER
 ----------------------------------------------------
-local function clearPlayerTracer(plr)
-    local data = tracerData.players[plr]
+local function clearPlayer(plr)
+    local data = tracerSystem.players[plr]
     if not data then return end
 
     if data.beam then data.beam:Destroy() end
@@ -3150,7 +3164,7 @@ local function clearPlayerTracer(plr)
         conn:Disconnect()
     end
 
-    tracerData.players[plr] = nil
+    tracerSystem.players[plr] = nil
 end
 
 ----------------------------------------------------
@@ -3158,7 +3172,7 @@ end
 ----------------------------------------------------
 local function attachTracer(plr, char)
 
-    if not tracerData.enabled then return end
+    if not tracerSystem.enabled then return end
     if plr == client then return end
 
     local myHRP = getMyHRP()
@@ -3167,20 +3181,17 @@ local function attachTracer(plr, char)
     local enemyHRP = char:WaitForChild("HumanoidRootPart",10)
     if not enemyHRP then return end
 
-    -- clear old first (prevents stacking)
-    clearPlayerTracer(plr)
+    clearPlayer(plr)
 
-    local data = {
-        connections = {}
-    }
-
-    tracerData.players[plr] = data
+    local data = { connections = {} }
+    tracerSystem.players[plr] = data
 
     local beam = Instance.new("Beam")
-    beam.Color = ColorSequence.new(Color3.new(1,0,0))
     beam.Width0 = 0.2
     beam.Width1 = 0.2
     beam.Transparency = NumberSequence.new(0.3)
+    beam.FaceCamera = true
+    beam.Color = ColorSequence.new(getTracerColor(plr))
 
     local att0 = Instance.new("Attachment")
     att0.Parent = myHRP
@@ -3196,7 +3207,25 @@ local function attachTracer(plr, char)
     data.att0 = att0
     data.att1 = att1
 
-    -- if THEY respawn → rebuild
+    -- Update color if THEY change team
+    table.insert(data.connections,
+        plr:GetPropertyChangedSignal("Team"):Connect(function()
+            if beam then
+                beam.Color = ColorSequence.new(getTracerColor(plr))
+            end
+        end)
+    )
+
+    -- Update color if YOU change team
+    table.insert(data.connections,
+        client:GetPropertyChangedSignal("Team"):Connect(function()
+            if beam then
+                beam.Color = ColorSequence.new(getTracerColor(plr))
+            end
+        end)
+    )
+
+    -- Reattach if THEY respawn
     table.insert(data.connections,
         plr.CharacterAdded:Connect(function(newChar)
             task.wait(0.2)
@@ -3208,9 +3237,9 @@ end
 ----------------------------------------------------
 -- CREATE FOR PLAYER
 ----------------------------------------------------
-local function createTracerForPlayer(plr)
+local function createForPlayer(plr)
     if plr == client then return end
-    if tracerData.players[plr] then return end
+    if tracerSystem.players[plr] then return end
 
     if plr.Character then
         attachTracer(plr, plr.Character)
@@ -3222,42 +3251,41 @@ end
 ----------------------------------------------------
 function enableTracers()
 
-    if tracerData.enabled then return end
-    tracerData.enabled = true
+    if tracerSystem.enabled then return end
+    tracerSystem.enabled = true
 
     -- existing players
     for _,plr in ipairs(Players:GetPlayers()) do
-        createTracerForPlayer(plr)
+        createForPlayer(plr)
     end
 
     -- new players
-    table.insert(tracerData.connections,
+    table.insert(tracerSystem.connections,
         Players.PlayerAdded:Connect(function(plr)
-            if tracerData.enabled then
-                createTracerForPlayer(plr)
+            if tracerSystem.enabled then
+                createForPlayer(plr)
             end
         end)
     )
 
-    -- player leaving cleanup
-    table.insert(tracerData.connections,
+    -- cleanup on leave
+    table.insert(tracerSystem.connections,
         Players.PlayerRemoving:Connect(function(plr)
-            clearPlayerTracer(plr)
+            clearPlayer(plr)
         end)
     )
 
-    -- YOU respawn → rebuild everything
-    table.insert(tracerData.connections,
+    -- YOU respawn → rebuild all
+    table.insert(tracerSystem.connections,
         client.CharacterAdded:Connect(function()
             task.wait(0.3)
 
-            -- rebuild all tracers cleanly
-            for plr,_ in pairs(tracerData.players) do
-                clearPlayerTracer(plr)
+            for plr,_ in pairs(tracerSystem.players) do
+                clearPlayer(plr)
             end
 
             for _,plr in ipairs(Players:GetPlayers()) do
-                createTracerForPlayer(plr)
+                createForPlayer(plr)
             end
         end)
     )
@@ -3270,19 +3298,19 @@ end
 ----------------------------------------------------
 function disableTracers()
 
-    if not tracerData.enabled then return end
-    tracerData.enabled = false
+    if not tracerSystem.enabled then return end
+    tracerSystem.enabled = false
 
-    for _,conn in ipairs(tracerData.connections) do
+    for _,conn in ipairs(tracerSystem.connections) do
         conn:Disconnect()
     end
-    tracerData.connections = {}
+    tracerSystem.connections = {}
 
-    for plr,_ in pairs(tracerData.players) do
-        clearPlayerTracer(plr)
+    for plr,_ in pairs(tracerSystem.players) do
+        clearPlayer(plr)
     end
 
-    tracerData.players = {}
+    tracerSystem.players = {}
 
     notify("❌ Tracers disabled", currentTheme.accent)
 end
