@@ -936,267 +936,176 @@ end
 -- =============================================================
 -- ENHANCED ESP SYSTEM
 -- =============================================================
--- FIXED Selective ESP: Survives YOUR death/respawn + TARGET death/respawn
--- !esp <name> / !unesp <name> / !unesp all
--- Uses persistent ScreenGui (ResetOnSpawn = false) → NEVER breaks on death
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local client = Players.LocalPlayer
-
--- Create PERSISTENT GUI (survives death/respawn)
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "PersistentESP"
-espGui.ResetOnSpawn = false
-espGui.DisplayOrder = 999
-espGui.Parent = game:GetService("CoreGui")  -- Exploit-safe, survives everything
-
 local espData = {
-    playerESP = {},  -- plr → espElements
+    enabled = false,
+    playerESP = {},
     teamColors = true,
     showNames = true,
     showDistance = true,
-    globalConnections = {}
+    connections = {}
 }
-
-local myHRP = nil  -- Updates on respawn
-
-local function getHRP(plr)
-    return plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-end
-
-local function clearHighlightsAndTags(espElements)
-    for _, h in ipairs(espElements.highlights) do
-        if h and h.Parent then h:Destroy() end
-    end
-    espElements.highlights = {}
-    for _, tag in ipairs(espElements.nametags) do
-        if tag.billboard and tag.billboard.Parent then tag.billboard:Destroy() end
-    end
-    espElements.nametags = {}
-end
 
 local function createESP(plr)
     if plr == client or espData.playerESP[plr] then return end
-
+    
     local espFolder = Instance.new("Folder")
     espFolder.Name = plr.Name .. "_ESP"
-    espFolder.Parent = espGui
-
+    espFolder.Parent = client.PlayerGui
+    
     local espElements = {
         folder = espFolder,
         highlights = {},
-        nametags = [],
+        nametags = {},
         connections = {}
     }
-
+    
     local function setupCharacter(char)
-        -- Only setup if ESP still active
-        if not espElements.folder.Parent then return end
-
-        -- Clear old ones first
-        clearHighlightsAndTags(espElements)
-
-        local highlightColor = Color3.fromRGB(255, 0, 0)
+        if not char then return end
+        
+        local highlightColor = Color3.new(1, 0, 0)
         if espData.teamColors and plr.Team then
-            highlightColor = plr.TeamColor.Color
+            highlightColor = plr.Team.TeamColor.Color
         end
-
-        -- Highlight
+        
         local highlight = Instance.new("Highlight")
         highlight.Adornee = char
         highlight.FillColor = highlightColor
-        highlight.FillTransparency = 0.65
-        highlight.OutlineColor = Color3.new(1,1,1)
+        highlight.FillTransparency = 0.7
+        highlight.OutlineColor = Color3.new(1, 1, 1)
         highlight.OutlineTransparency = 0
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Parent = espFolder
         table.insert(espElements.highlights, highlight)
-
-        -- Nametag + Distance
+        
         if espData.showNames then
-            local head = char:WaitForChild("Head", 10)
+            local head = char:WaitForChild("Head", 5)
             if head then
                 local billboard = Instance.new("BillboardGui")
                 billboard.Adornee = head
-                billboard.Size = UDim2.new(0, 240, 0, 75)
-                billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+                billboard.Size = UDim2.new(0, 200, 0, 60)
+                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
                 billboard.AlwaysOnTop = true
-                billboard.LightInfluence = 0
                 billboard.Parent = espFolder
-
-                local nameLabel = Instance.new("TextLabel")
+                
+                local nameLabel = Instance.new("TextLabel", billboard)
                 nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
                 nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = plr.Name
                 nameLabel.Font = Enum.Font.GothamBold
-                nameLabel.TextSize = 20
+                nameLabel.TextSize = 16
                 nameLabel.TextColor3 = highlightColor
+                nameLabel.TextTransparency = 0 -- SOLID
                 nameLabel.TextStrokeTransparency = 0
                 nameLabel.TextStrokeColor3 = Color3.new(0,0,0)
-                nameLabel.Text = plr.Name
-                nameLabel.Parent = billboard
-
-                local dispLabel = Instance.new("TextLabel")
-                dispLabel.Size = UDim2.new(1, 0, 0.3, 0)
-                dispLabel.Position = UDim2.new(0,0,0.38,0)
-                dispLabel.BackgroundTransparency = 1
-                dispLabel.Font = Enum.Font.Gotham
-                dispLabel.TextSize = 15
-                dispLabel.TextColor3 = Color3.fromRGB(220,220,220)
-                dispLabel.TextStrokeTransparency = 0
-                dispLabel.TextStrokeColor3 = Color3.new(0,0,0)
-                dispLabel.Text = "@" .. plr.DisplayName
-                dispLabel.Parent = billboard
-
-                local distLabel = Instance.new("TextLabel")
-                distLabel.Size = UDim2.new(1, 0, 0.3, 0)
-                distLabel.Position = UDim2.new(0,0,0.68,0)
-                distLabel.BackgroundTransparency = 1
-                distLabel.Font = Enum.Font.Gotham
-                distLabel.TextSize = 14
-                distLabel.TextColor3 = Color3.new(1,1,1)
-                distLabel.TextStrokeTransparency = 0
-                distLabel.TextStrokeColor3 = Color3.new(0,0,0)
-                distLabel.Text = "?"
-                distLabel.Parent = billboard
-
-                table.insert(espElements.nametags, {
-                    billboard = billboard,
-                    distLabel = distLabel,
-                    player = plr
-                })
+                
+                local displayLabel = Instance.new("TextLabel", billboard)
+                displayLabel.Size = UDim2.new(1, 0, 0.3, 0)
+                displayLabel.Position = UDim2.new(0, 0, 0.35, 0)
+                displayLabel.BackgroundTransparency = 1
+                displayLabel.Text = "@" .. plr.DisplayName
+                displayLabel.Font = Enum.Font.Gotham
+                displayLabel.TextSize = 14
+                displayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                displayLabel.TextTransparency = 0 -- SOLID
+                displayLabel.TextStrokeTransparency = 0
+                displayLabel.TextStrokeColor3 = Color3.new(0,0,0)
+                
+                if espData.showDistance then
+                    local distLabel = Instance.new("TextLabel", billboard)
+                    distLabel.Size = UDim2.new(1, 0, 0.3, 0)
+                    distLabel.Position = UDim2.new(0, 0, 0.65, 0)
+                    distLabel.BackgroundTransparency = 1
+                    distLabel.Text = "0 studs"
+                    distLabel.Font = Enum.Font.Gotham
+                    distLabel.TextSize = 12
+                    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    distLabel.TextTransparency = 0 -- SOLID
+                    distLabel.TextStrokeTransparency = 0
+                    distLabel.TextStrokeColor3 = Color3.new(0,0,0)
+                    
+                    table.insert(espElements.nametags, {label = distLabel, player = plr})
+                end
+                
+                table.insert(espElements.nametags, billboard)
             end
         end
     end
-
-    -- Setup current char if exists
+    
     if plr.Character then
         setupCharacter(plr.Character)
     end
-
-    -- Re-setup on target respawn
-    local charAddedConn = plr.CharacterAdded:Connect(setupCharacter)
-    table.insert(espElements.connections, charAddedConn)
-
+    
+    local charConn = plr.CharacterAdded:Connect(setupCharacter)
+    table.insert(espElements.connections, charConn)
+    
     espData.playerESP[plr] = espElements
 end
 
 local function removeESP(plr)
-    local espElements = espData.playerESP[plr]
-    if not espElements then return end
-
-    -- Disconnect per-player conns
-    for _, conn in ipairs(espElements.connections) do
+    local data = espData.playerESP[plr]
+    if not data then return end
+    
+    for _, conn in ipairs(data.connections) do
         conn:Disconnect()
     end
-
-    -- Destroy folder/elements
-    if espElements.folder then
-        espElements.folder:Destroy()
-    end
-
+    data.folder:Destroy()
     espData.playerESP[plr] = nil
 end
 
--- Distance updater (runs always if any ESP active)
-local function updateDistances()
-    local myPos = myHRP and myHRP.Position
-    if not myPos then return end
-
-    for _, espElements in pairs(espData.playerESP) do
-        for _, tag in ipairs(espElements.nametags) do
-            local tHRP = getHRP(tag.player)
-            if tHRP then
-                local dist = math.floor((tHRP.Position - myPos).Magnitude)
-                tag.distLabel.Text = dist .. " studs"
-            else
-                tag.distLabel.Text = "?"
-            end
-        end
-    end
-end
-
-local function startUpdater()
-    if #espData.globalConnections > 0 then return end
-
-    local heartbeatConn = RunService.Heartbeat:Connect(updateDistances)
-    table.insert(espData.globalConnections, heartbeatConn)
-end
-
-local function stopUpdater()
-    for _, conn in ipairs(espData.globalConnections) do
-        conn:Disconnect()
-    end
-    espData.globalConnections = {}
-end
-
--- Update myHRP on respawn
-local function onMyCharacterAdded(char)
-    myHRP = char:WaitForChild("HumanoidRootPart", 10)
-    -- Restart updater if needed
-    if next(espData.playerESP) then
-        startUpdater()
-    end
-end
-
-client.CharacterAdded:Connect(onMyCharacterAdded)
-if client.Character then
-    onMyCharacterAdded(client.Character)
-end
-
--- Clean up on player leave
-Players.PlayerRemoving:Connect(function(plr)
-    removeESP(plr)
-end)
-
--- CHAT COMMANDS (survives respawn automatically)
-client.Chatted:Connect(function(msg)
-    local lowerMsg = msg:lower():gsub("^%s*(.-)%s*$", "%1")  -- trim
-
-    if lowerMsg:sub(1, 5) == "!esp " then
-        local targetName = lowerMsg:sub(6)
-        local foundPlayer = nil
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= client and (p.Name:lower():find(targetName, 1, true) or p.DisplayName:lower():find(targetName, 1, true)) then
-                foundPlayer = p
-                break
-            end
-        end
-        if foundPlayer then
-            createESP(foundPlayer)
-            startUpdater()
-            notify("✅ ESP ON: " .. foundPlayer.Name, Color3.fromRGB(100, 255, 100))
-        else
-            notify("❌ Player not found: " .. targetName, Color3.fromRGB(255, 100, 100))
-        end
-
-    elseif lowerMsg:sub(1, 7) == "!unesp " then
-        local arg = lowerMsg:sub(8)
-        if arg == "all" then
-            for targetPlr in pairs(espData.playerESP) do
-                removeESP(targetPlr)
-            end
-            stopUpdater()
-            notify("❌ ALL ESP OFF", Color3.fromRGB(255, 100, 100))
-        else
-            local found = false
-            for targetPlr in pairs(espData.playerESP) do
-                if targetPlr.Name:lower():find(arg, 1, true) or targetPlr.DisplayName:lower():find(arg, 1, true) then
-                    removeESP(targetPlr)
-                    found = true
-                    notify("❌ ESP OFF: " .. targetPlr.Name, Color3.fromRGB(255, 160, 60))
-                    break
+local function enableESPAll()
+    if espData.enabled then return end
+    espData.enabled = true
+    
+    local distConn = RunService.Heartbeat:Connect(function()
+        for _, data in pairs(espData.playerESP) do
+            for _, tagData in ipairs(data.nametags) do
+                if typeof(tagData) == "table" and tagData.label and tagData.player then
+                    local p = tagData.player
+                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and hrp then
+                        local dist = math.floor((p.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                        tagData.label.Text = dist .. " studs"
+                    end
                 end
             end
-            if not found and arg ~= "" then
-                notify("❌ No ESP for: " .. arg, Color3.fromRGB(255, 100, 100))
-            end
+        end
+    end)
+    table.insert(espData.connections, distConn)
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= client then
+            createESP(p)
         end
     end
-end)
+    
+    local newPlayerConn = Players.PlayerAdded:Connect(function(p)
+        if espData.enabled then
+            createESP(p)
+        end
+    end)
+    table.insert(espData.connections, newPlayerConn)
+    
+    local removeConn = Players.PlayerRemoving:Connect(function(p)
+        removeESP(p)
+    end)
+    table.insert(espData.connections, removeConn)
+    
+    notify("✅ ESP All enabled (Team colors, Names, Distance)", Color3.fromRGB(100, 255, 100))
+end
 
-print("✅ FIXED Persistent ESP loaded! Survives all deaths. !esp <name> / !unesp <name/all>")
+local function disableESPAll()
+    if not espData.enabled then return end
+    espData.enabled = false
+    
+    for _, conn in ipairs(espData.connections) do
+        conn:Disconnect()
+    end
+    espData.connections = {}
+    
+    for plr, _ in pairs(espData.playerESP) do
+        removeESP(plr)
+    end
+    
+    notify("❌ ESP All disabled", Color3.fromRGB(255, 100, 100))
+end
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
