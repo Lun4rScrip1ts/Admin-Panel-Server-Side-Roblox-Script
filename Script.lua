@@ -937,11 +937,10 @@ end
 -- ENHANCED ESP SYSTEM
 -- =============================================================
 -- =============================================================
--- ENHANCED ESP SYSTEM (FIXED)
--- =============================================================
-
--- =============================================================
--- ENHANCED ESP SYSTEM (FULL + TARGET USERNAMES)
+-- ENHANCED ESP SYSTEM (TARGET COMMANDS BUILT-IN)
+-- Commands:
+-- !esp (name)
+-- !unesp (name)
 -- =============================================================
 
 local Players = game:GetService("Players")
@@ -957,7 +956,7 @@ local espData = {
     showDistance = true,
     connections = {},
 
-    -- targeting
+    -- target system
     targetMode = false,
     targetStrings = {}
 }
@@ -1005,7 +1004,6 @@ local function createESP(plr)
         highlights = {},
         nametags = {},
         connections = {},
-        character = nil
     }
 
     local function clearESP()
@@ -1029,15 +1027,12 @@ local function createESP(plr)
         local hrp = char:WaitForChild("HumanoidRootPart",5)
         if not head or not hrp then return end
 
-        espElements.character = char
-
-        -- TEAM COLOR
         local highlightColor = Color3.new(1,0,0)
         if espData.teamColors and plr.Team then
             highlightColor = plr.Team.TeamColor.Color
         end
 
-        -- HIGHLIGHT
+        -- highlight
         local highlight = Instance.new("Highlight")
         highlight.Adornee = char
         highlight.FillColor = highlightColor
@@ -1047,7 +1042,7 @@ local function createESP(plr)
         highlight.Parent = workspace
         table.insert(espElements.highlights, highlight)
 
-        -- NAMETAGS
+        -- nametag
         if espData.showNames then
             local billboard = Instance.new("BillboardGui")
             billboard.Adornee = head
@@ -1135,98 +1130,102 @@ local function removeESP(plr)
 end
 
 ----------------------------------------------------
--- ENABLE ALL
+-- DISTANCE UPDATER
 ----------------------------------------------------
 
-local function enableESPAll()
-    if espData.enabled then return end
-    espData.enabled = true
-    espData.targetMode = false
+RunService.RenderStepped:Connect(function()
+    if not espData.enabled then return end
 
-    local distConn
-    distConn = RunService.RenderStepped:Connect(function()
-        local myHRP = getMyHRP()
-        if not myHRP then return end
+    local myHRP = getMyHRP()
+    if not myHRP then return end
 
-        for _,data in pairs(espData.playerESP) do
-            for _,tagData in ipairs(data.nametags) do
-                if typeof(tagData) == "table" and tagData.label and tagData.player then
-                    local p = tagData.player
-                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local dist = math.floor(
-                            (p.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude
-                        )
-                        tagData.label.Text = dist.." studs"
-                    end
+    for _,data in pairs(espData.playerESP) do
+        for _,tagData in ipairs(data.nametags) do
+            if typeof(tagData) == "table" and tagData.label and tagData.player then
+                local p = tagData.player
+                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = math.floor(
+                        (p.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude
+                    )
+                    tagData.label.Text = dist.." studs"
                 end
             end
         end
-    end)
-
-    table.insert(espData.connections,distConn)
-
-    for _,p in ipairs(Players:GetPlayers()) do
-        createESP(p)
     end
+end)
 
-    table.insert(espData.connections,Players.PlayerAdded:Connect(function(p)
-        if nameMatches(p) then
-            createESP(p)
+----------------------------------------------------
+-- TARGET COMMANDS
+----------------------------------------------------
+
+local function findMatchingPlayers(word)
+    local matches = {}
+    word = string.lower(word)
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= client then
+            local username = string.lower(plr.Name)
+            local display = string.lower(plr.DisplayName)
+
+            if string.find(username, word, 1, true)
+            or string.find(display, word, 1, true) then
+                table.insert(matches, plr)
+            end
         end
-    end))
-
-    table.insert(espData.connections,Players.PlayerRemoving:Connect(removeESP))
-
-    notify("✅ ESP All enabled", Color3.fromRGB(100,255,100))
+    end
+    return matches
 end
 
-----------------------------------------------------
--- TARGETED ESP
-----------------------------------------------------
+local function commandESP(word)
+    if not word then return end
 
-function enableESPTarget(word)
     espData.enabled = true
     espData.targetMode = true
     table.insert(espData.targetStrings, word)
 
-    for _,p in ipairs(Players:GetPlayers()) do
-        if nameMatches(p) then
-            createESP(p)
+    local matches = findMatchingPlayers(word)
+
+    for _,plr in ipairs(matches) do
+        createESP(plr)
+    end
+
+    notify("🎯 ESP: "..word, Color3.fromRGB(255,200,0))
+end
+
+local function commandUnESP(word)
+    if not word then return end
+
+    word = string.lower(word)
+
+    for i,v in ipairs(espData.targetStrings) do
+        if string.lower(v) == word then
+            table.remove(espData.targetStrings, i)
         end
     end
 
-    notify("🎯 ESP targeting: "..word, Color3.fromRGB(255,200,0))
-end
-
-function clearESPTargets()
-    espData.targetStrings = {}
-
-    for plr,_ in pairs(espData.playerESP) do
+    local matches = findMatchingPlayers(word)
+    for _,plr in ipairs(matches) do
         removeESP(plr)
     end
 
-    notify("ESP targets cleared", Color3.fromRGB(255,150,150))
+    notify("Removed ESP: "..word, Color3.fromRGB(255,150,150))
 end
 
 ----------------------------------------------------
--- DISABLE
+-- CHAT COMMAND LISTENER
 ----------------------------------------------------
 
-local function disableESPAll()
-    if not espData.enabled then return end
-    espData.enabled = false
+client.Chatted:Connect(function(msg)
+    local args = string.split(msg," ")
 
-    for _,conn in ipairs(espData.connections) do
-        conn:Disconnect()
-    end
-    espData.connections = {}
-
-    for plr,_ in pairs(espData.playerESP) do
-        removeESP(plr)
+    if args[1] == "!esp" and args[2] and args[2] ~= "all" then
+        commandESP(args[2])
     end
 
-    notify("❌ ESP disabled", Color3.fromRGB(255,100,100))
-end
+    if args[1] == "!unesp" and args[2] then
+        commandUnESP(args[2])
+    end
+end)
 -- =============================================================
 -- SPIN SYSTEM
 -- =============================================================
