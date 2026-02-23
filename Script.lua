@@ -2339,7 +2339,9 @@ local gods = {}
 local invis = {}
 local rainbowData = {}
 local ragdolls = {}
-
+------------------------------------------------
+-- advanced speed
+------------------------------------------------
 local function setspeed(plr, num)
     if plr ~= client then
         notify("❌ Speed only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2351,7 +2353,9 @@ local function setspeed(plr, num)
         notify("✅ WalkSpeed set to " .. hum.WalkSpeed, currentTheme.accent)
     end
 end
-
+------------------------------------------------
+-- advanced resetspeed
+------------------------------------------------
 local function resetspeed(plr)
     if plr ~= client then
         notify("❌ Resetspeed only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2363,7 +2367,9 @@ local function resetspeed(plr)
         notify("✅ WalkSpeed reset to 16", Color3.fromRGB(180, 180, 255))
     end
 end
-
+------------------------------------------------
+-- advanced noclip
+------------------------------------------------
 local function noclip(plr)
     if plr ~= client then
         notify("❌ Noclip only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2384,7 +2390,9 @@ local function noclip(plr)
     end)
     notify("✅ Noclip enabled", Color3.fromRGB(100, 255, 120))
 end
-
+------------------------------------------------
+-- advanced unnoclip
+------------------------------------------------
 local function unnoclip(plr)
     if plr ~= client then
         notify("❌ Unnoclip only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2403,7 +2411,9 @@ local function unnoclip(plr)
     end
     notify("✅ Noclip disabled", Color3.fromRGB(255, 120, 100))
 end
-
+------------------------------------------------
+-- advanced heal
+------------------------------------------------
 local function heal(plr)
     local hum = getHum(plr)
     if hum then
@@ -2413,7 +2423,9 @@ local function heal(plr)
         notify("❌ Cannot heal - no humanoid found", Color3.fromRGB(255, 100, 100))
     end
 end
-
+------------------------------------------------
+-- advanced kill
+------------------------------------------------
 local function kill(plr)
     local char = plr and plr.Character
     if not char then 
@@ -2427,7 +2439,9 @@ local function kill(plr)
     end)
     notify("💀 Killed " .. plr.Name, Color3.fromRGB(255, 80, 80))
 end
-
+------------------------------------------------
+-- advanced tp
+------------------------------------------------
 local function tp(p1, p2)
     if p1 ~= client then
         notify("❌ Teleport only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2445,11 +2459,15 @@ local function tp(p1, p2)
         notify("❌ Teleport failed - missing character parts", Color3.fromRGB(255, 100, 100))
     end
 end
-
+------------------------------------------------
+-- advanced bring
+------------------------------------------------
 local function bring(plr)
     notify("⚠️ Bring not possible client-side", Color3.fromRGB(255, 200, 100))
 end
-
+------------------------------------------------
+-- advanced to
+------------------------------------------------
 local function gotoMe(target)
     if not target then
         notify("❌ No target specified", Color3.fromRGB(255, 100, 100))
@@ -2457,7 +2475,9 @@ local function gotoMe(target)
     end
     tp(client, target)
 end
-
+------------------------------------------------
+-- advanced Jumppower
+------------------------------------------------
 local function jump(plr, pow)
     if plr ~= client then
         notify("❌ Jump only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2469,7 +2489,9 @@ local function jump(plr, pow)
         notify("✅ Jump power set to " .. hum.JumpPower, Color3.fromRGB(200, 200, 100))
     end
 end
-
+------------------------------------------------
+-- advanced sit
+------------------------------------------------
 local function sit(plr)
     if plr ~= client then
         notify("❌ Sit only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2481,7 +2503,9 @@ local function sit(plr)
         notify("✅ Sitting", Color3.fromRGB(200, 150, 255))
     end
 end
-
+------------------------------------------------
+-- advanced Lay
+------------------------------------------------
 local function lay(plr)
     if plr ~= client then
         notify("❌ Lay only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2496,7 +2520,9 @@ local function lay(plr)
         notify("✅ Laying down", Color3.fromRGB(200, 150, 255))
     end
 end
-
+------------------------------------------------
+-- advanced Freeze
+------------------------------------------------
 local function freeze(plr)
     if plr ~= client then
         notify("❌ Freeze only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2512,7 +2538,9 @@ local function freeze(plr)
     hum.JumpPower = 0
     notify("❄️ Frozen", Color3.fromRGB(100, 100, 255))
 end
-
+------------------------------------------------
+-- advanced Unfreeze
+------------------------------------------------
 local function unfreeze(plr)
     if plr ~= client then
         notify("❌ Unfreeze only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2529,7 +2557,9 @@ local function unfreeze(plr)
         notify("⚠️ Not frozen", Color3.fromRGB(255, 200, 100))
     end
 end
-
+------------------------------------------------
+-- advanced God
+------------------------------------------------
 local function god(plr)
     if plr ~= client then
         notify("❌ God mode only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2547,7 +2577,9 @@ local function god(plr)
         notify("👑 God mode enabled", Color3.fromRGB(255, 215, 0))
     end
 end
-
+------------------------------------------------
+-- advanced Ungod
+------------------------------------------------
 local function ungod(plr)
     if plr ~= client then
         notify("❌ Ungod only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2561,7 +2593,9 @@ local function ungod(plr)
         notify("⚠️ Not in god mode", Color3.fromRGB(255, 200, 100))
     end
 end
-
+------------------------------------------------
+-- advanced Invisible
+------------------------------------------------
 local function invisP(plr)
     if plr ~= client then
         notify("❌ Invisibility only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2582,7 +2616,9 @@ local function invisP(plr)
     invis[plr] = true
     notify("👻 Invisible", Color3.fromRGB(180, 100, 255))
 end
-
+------------------------------------------------
+-- advanced Visible
+------------------------------------------------
 local function visP(plr)
     if plr ~= client then
         notify("❌ Visibility only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2603,7 +2639,9 @@ local function visP(plr)
     invis[plr] = nil
     notify("✅ Visible", Color3.fromRGB(100, 180, 255))
 end
-
+------------------------------------------------
+-- advanced Fling
+------------------------------------------------
 local function fling(plr)
     if plr ~= client then
         notify("❌ Fling only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2619,7 +2657,9 @@ local function fling(plr)
         notify("💨 Flung!", Color3.fromRGB(255, 100, 180))
     end
 end
-
+------------------------------------------------
+-- advanced Rejoin
+------------------------------------------------
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -2631,13 +2671,17 @@ local function rejoin()
     -- This rejoins **exactly** the current server (using current JobId)
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end
-
+------------------------------------------------
+-- advanced Ping
+------------------------------------------------
 local function ping()
     local ping = math.round(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
     local color = ping < 100 and Color3.fromRGB(100, 255, 100) or (ping < 200 and Color3.fromRGB(255, 255, 100) or Color3.fromRGB(255, 100, 100))
     notify("📶 Ping: " .. ping .. "ms", color)
 end
-
+------------------------------------------------
+-- advanced ClickTP
+------------------------------------------------
 local clickTPconn
 local function clickTP()
     if clickTPconn then
@@ -2656,7 +2700,9 @@ local function clickTP()
         notify("✅ Click TP enabled - click anywhere to teleport", Color3.fromRGB(100, 255, 120))
     end
 end
-
+------------------------------------------------
+-- advanced FOV
+------------------------------------------------
 local function setFov(val)
     local num = tonumber(val)
     if num and num >= 1 and num <= 120 then
@@ -2666,7 +2712,9 @@ local function setFov(val)
         notify("❌ Invalid FOV (1-120)", Color3.fromRGB(255, 100, 100))
     end
 end
-
+------------------------------------------------
+-- advanced kick
+------------------------------------------------
 local function kick(plr)
     if plr == client then
         client:Kick("Kicked via Lunar Admin")
@@ -2674,7 +2722,9 @@ local function kick(plr)
         notify("⚠️ Kick only works on yourself (client-side)", Color3.fromRGB(255, 170, 0))
     end
 end
-
+------------------------------------------------
+-- advanced ragdoll
+------------------------------------------------
 local function ragdoll(plr)
     if plr ~= client then
         notify("❌ Ragdoll only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2698,7 +2748,9 @@ local function ragdoll(plr)
     ragdolls[plr] = joints
     notify("🦴 Ragdolled", Color3.fromRGB(200, 100, 100))
 end
-
+------------------------------------------------
+-- advanced unragdoll
+------------------------------------------------
 local function unragdoll(plr)
     if plr ~= client then
         notify("❌ Unragdoll only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2718,12 +2770,16 @@ local function unragdoll(plr)
     ragdolls[plr] = nil
     notify("✅ Unragdolled", Color3.fromRGB(100, 200, 100))
 end
-
+------------------------------------------------
+-- advanced console
+------------------------------------------------
 local function console()
     StarterGui:SetCore("DevConsoleVisible", true)
     notify("✅ Console opened", Color3.fromRGB(180, 180, 255))
 end
-
+------------------------------------------------
+-- advanced disable fall damage
+------------------------------------------------
 local function disableFallDamage()
     local conn = client.CharacterAdded:Connect(function(char)
         local hum = char:WaitForChild("Humanoid", 5)
@@ -2733,7 +2789,9 @@ local function disableFallDamage()
     end)
     notify("✅ Fall damage disabled", Color3.fromRGB(100, 255, 180))
 end
-
+------------------------------------------------
+-- advanced enable inventory
+------------------------------------------------
 local function enableCore(name)
     local enum
     if name == "inventory" then enum = Enum.CoreGuiType.Backpack
@@ -2746,7 +2804,9 @@ local function enableCore(name)
     StarterGui:SetCoreGuiEnabled(enum, not current)
     notify("✅ " .. name:gsub("^%l", string.upper) .. (not current and " enabled" or " disabled"), Color3.fromRGB(180, 180, 255))
 end
-
+------------------------------------------------
+-- advanced Dance
+------------------------------------------------
 local function dance(plr)
     if plr ~= client then
         notify("❌ Dance only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2762,7 +2822,9 @@ local function dance(plr)
         notify("💃 Dancing!", Color3.fromRGB(255, 100, 255))
     end
 end
-
+------------------------------------------------
+-- advanced trip
+------------------------------------------------
 local function trip(plr)
     if plr ~= client then
         notify("❌ Trip only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2776,9 +2838,9 @@ local function trip(plr)
     end
 end
 
--- Improved explode() that ragdolls + detaches limbs visibly (server-side visible in most games)
--- This makes your character "explode" by breaking joints/connections and scattering parts
--- Works in many games where you can manipulate your own character locally (FE-friendly visual death)
+------------------------------------
+-- advanced explode 
+------------------------------------
 
 local function explode(plr)
     local char = plr.Character
@@ -3144,7 +3206,8 @@ local function enableTracers()
 end
 
 ----------------------------------------------------
-
+-- advanced Disable tracers
+------------------------------------------------
 local function disableTracers()
     tracersEnabled = false
     clearTracers()
