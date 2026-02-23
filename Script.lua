@@ -940,8 +940,14 @@ end
 -- ENHANCED ESP SYSTEM (FIXED)
 -- =============================================================
 
+-- =============================================================
+-- ENHANCED ESP SYSTEM (FULL + TARGET USERNAMES)
+-- =============================================================
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+
+local client = Players.LocalPlayer
 
 local espData = {
     enabled = false,
@@ -949,8 +955,16 @@ local espData = {
     teamColors = true,
     showNames = true,
     showDistance = true,
-    connections = {}
+    connections = {},
+
+    -- targeting
+    targetMode = false,
+    targetStrings = {}
 }
+
+----------------------------------------------------
+-- UTIL
+----------------------------------------------------
 
 local function getMyHRP()
     local char = client.Character
@@ -959,9 +973,33 @@ local function getMyHRP()
     end
 end
 
+local function nameMatches(plr)
+    if not espData.targetMode then
+        return true
+    end
+
+    local username = string.lower(plr.Name)
+    local display = string.lower(plr.DisplayName)
+
+    for _,word in ipairs(espData.targetStrings) do
+        word = string.lower(word)
+
+        if string.find(username, word, 1, true)
+        or string.find(display, word, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+----------------------------------------------------
 -- CREATE ESP
+----------------------------------------------------
+
 local function createESP(plr)
     if plr == client or espData.playerESP[plr] then return end
+    if not nameMatches(plr) then return end
 
     local espElements = {
         highlights = {},
@@ -999,7 +1037,7 @@ local function createESP(plr)
             highlightColor = plr.Team.TeamColor.Color
         end
 
-        -- HIGHLIGHT (must be in workspace)
+        -- HIGHLIGHT
         local highlight = Instance.new("Highlight")
         highlight.Adornee = char
         highlight.FillColor = highlightColor
@@ -1007,7 +1045,6 @@ local function createESP(plr)
         highlight.OutlineColor = Color3.new(1,1,1)
         highlight.OutlineTransparency = 0
         highlight.Parent = workspace
-
         table.insert(espElements.highlights, highlight)
 
         -- NAMETAGS
@@ -1073,7 +1110,10 @@ local function createESP(plr)
     espData.playerESP[plr] = espElements
 end
 
--- REMOVE
+----------------------------------------------------
+-- REMOVE ESP
+----------------------------------------------------
+
 local function removeESP(plr)
     local data = espData.playerESP[plr]
     if not data then return end
@@ -1094,12 +1134,15 @@ local function removeESP(plr)
     espData.playerESP[plr] = nil
 end
 
--- ENABLE
+----------------------------------------------------
+-- ENABLE ALL
+----------------------------------------------------
+
 local function enableESPAll()
     if espData.enabled then return end
     espData.enabled = true
+    espData.targetMode = false
 
-    -- distance updater (FIXED HRP)
     local distConn
     distConn = RunService.RenderStepped:Connect(function()
         local myHRP = getMyHRP()
@@ -1123,18 +1166,52 @@ local function enableESPAll()
     table.insert(espData.connections,distConn)
 
     for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= client then
+        createESP(p)
+    end
+
+    table.insert(espData.connections,Players.PlayerAdded:Connect(function(p)
+        if nameMatches(p) then
+            createESP(p)
+        end
+    end))
+
+    table.insert(espData.connections,Players.PlayerRemoving:Connect(removeESP))
+
+    notify("✅ ESP All enabled", Color3.fromRGB(100,255,100))
+end
+
+----------------------------------------------------
+-- TARGETED ESP
+----------------------------------------------------
+
+function enableESPTarget(word)
+    espData.enabled = true
+    espData.targetMode = true
+    table.insert(espData.targetStrings, word)
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if nameMatches(p) then
             createESP(p)
         end
     end
 
-    table.insert(espData.connections,Players.PlayerAdded:Connect(createESP))
-    table.insert(espData.connections,Players.PlayerRemoving:Connect(removeESP))
-
-    notify("✅ ESP All enabled (Team colors, Names, Distance)", Color3.fromRGB(100,255,100))
+    notify("🎯 ESP targeting: "..word, Color3.fromRGB(255,200,0))
 end
 
+function clearESPTargets()
+    espData.targetStrings = {}
+
+    for plr,_ in pairs(espData.playerESP) do
+        removeESP(plr)
+    end
+
+    notify("ESP targets cleared", Color3.fromRGB(255,150,150))
+end
+
+----------------------------------------------------
 -- DISABLE
+----------------------------------------------------
+
 local function disableESPAll()
     if not espData.enabled then return end
     espData.enabled = false
@@ -1148,7 +1225,7 @@ local function disableESPAll()
         removeESP(plr)
     end
 
-    notify("❌ ESP All disabled", Color3.fromRGB(255,100,100))
+    notify("❌ ESP disabled", Color3.fromRGB(255,100,100))
 end
 -- =============================================================
 -- SPIN SYSTEM
