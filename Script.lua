@@ -2857,85 +2857,9 @@ local function explode(plr)
     
     notify("💥 Exploded! Limbs detached & scattered", Color3.fromRGB(255, 60, 60))
 end
-
--- Float Higher (increased HipHeight - you walk/jump normally, just elevated)
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local client = Players.LocalPlayer  -- your LocalPlayer
-
-local currentExtraHeight = 0  -- tracks how much extra height we added
-local connection = nil        -- for smooth updating if needed
-
-local function setHeight(extraHeight)
-    local char = client.Character
-    if not char then return false end
-    
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-    
-    if not hum or not root then return false end
-    
-    -- Safety: don't go insanely high (prevents glitching through ceilings or falling forever)
-    extraHeight = math.clamp(extraHeight, 0, 15)  -- max ~15 studs up feels reasonable
-    
-    -- Apply the height
-    hum.HipHeight = hum.HipHeight + extraHeight - currentExtraHeight
-    
-    -- Optional: tiny offset to RootPart to match exactly (helps with some animations)
-    -- root.CFrame = root.CFrame + Vector3.new(0, extraHeight - currentExtraHeight, 0)
-    
-    currentExtraHeight = extraHeight
-    
-    notify("🌙 Floating " .. tostring(extraHeight) .. " studs higher! (normal movement kept)", Color3.fromRGB(120, 200, 255))
-    return true
-end
-
--- Main command function (call this when you want to change height)
-local function floatHigher(amount)
-    amount = amount or 4  -- default: 4 studs up (feels nice, not too high)
-    
-    if setHeight(amount) then
-        -- Optional: smooth transition if you want it animated
-        -- (uncomment if you like a slow rise/fall)
-        --[[
-        if connection then connection:Disconnect() end
-        connection = RunService.Heartbeat:Connect(function()
-            -- lerp or something if you want animation
-        end)
-        --]]
-    else
-        notify("❌ Couldn't apply height - respawn or wait for character", Color3.fromRGB(255, 100, 100))
-    end
-end
-
--- Optional: reset back to normal
-local function resetHeight()
-    setHeight(0)
-    notify("✅ Back to normal ground level", Color3.fromRGB(100, 255, 100))
-end
-
--- Example: how to trigger it (add to your chat command system)
--- !float 6    → float 6 studs up
--- !float      → default 4 studs
--- !ground     → reset
-
--- Example chat listener (paste this where your commands are handled)
---[[
-client.Chatted:Connect(function(msg)
-    local lower = msg:lower()
-    if lower:match("^!float%s*(%d*)") then
-        local num = tonumber(lower:match("^!float%s*(%d+)")) or 4
-        floatHigher(num)
-    elseif lower == "!ground" or lower == "!resetheight" then
-        resetHeight()
-    end
-end)
---]]
-
-print("Height float loaded! Use !float [number] or !ground")
-
+------------------------------------------------
+-- advanced tiny mode
+------------------------------------------------
 local function tiny(plr)
     if plr ~= client then
         notify("❌ Tiny only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2950,7 +2874,9 @@ local function tiny(plr)
         notify("🐜 Tiny mode!", Color3.fromRGB(100, 200, 255))
     end
 end
-
+------------------------------------------------
+-- advanced rainbow
+------------------------------------------------
 local function rainbow(plr)
     if plr ~= client then
         notify("❌ Rainbow only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2965,7 +2891,7 @@ local function rainbow(plr)
         notify("❌ No character for rainbow", Color3.fromRGB(255, 100, 100))
         return 
     end
-    local conn = RunService.Heartbeat:Connect(function()
+	local conn = RunService.Heartbeat:Connect(function()
         local hue = tick() % 5 / 5
         local c = Color3.fromHSV(hue, 1, 1)
         for _, part in char:GetDescendants() do
@@ -2977,7 +2903,9 @@ local function rainbow(plr)
     rainbowData[plr] = conn
     notify("🌈 Rainbow ON", Color3.fromRGB(255, 100, 255))
 end
-
+------------------------------------------------
+-- advanced unrainbow
+------------------------------------------------
 local function unrainbow(plr)
     if plr ~= client then
         notify("❌ Unrainbow only works on yourself", Color3.fromRGB(255, 100, 100))
@@ -2991,7 +2919,9 @@ local function unrainbow(plr)
         notify("⚠️ Not in rainbow mode", Color3.fromRGB(255, 200, 100))
     end
 end
-
+------------------------------------------------
+-- advanced fire
+------------------------------------------------
 local function fire(plr)
     local hrp = getHRP(plr)
     if hrp and not hrp:FindFirstChild("Fire") then
@@ -3003,7 +2933,9 @@ local function fire(plr)
         notify("⚠️ Already on fire or no character", Color3.fromRGB(255, 200, 100))
     end
 end
-
+------------------------------------------------
+-- advanced unfire
+------------------------------------------------
 local function unfire(plr)
     local hrp = getHRP(plr)
     if hrp then
@@ -3016,7 +2948,9 @@ local function unfire(plr)
         end
     end
 end
-
+------------------------------------------------
+-- advanced first person/thrid person
+------------------------------------------------
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -3068,7 +3002,9 @@ local function firstp()
     client.CameraMode = Enum.CameraMode.LockFirstPerson
     notify("✅ First person enabled", currentTheme.accent)
 end
-
+------------------------------------------------
+-- advanced Waypoint
+------------------------------------------------
 local function waypoint()
     local num = #waypoints + 1
     local wp = Instance.new("Part")
@@ -3111,33 +3047,107 @@ local function waypoint()
     notify("📍 Waypoint #" .. num .. " added", currentTheme.accent)
 end
 
-local function enableTracers()
-    for _, line in ipairs(tracerLines) do 
-        if line then line:Destroy() end 
+------------------------------------------------
+-- advanced tracers
+------------------------------------------------
+local tracerLines = {}
+local tracerConnections = {}
+local tracersEnabled = false
+
+local function getMyHRP()
+    if client.Character then
+        return client.Character:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+local function clearTracers()
+    for _, line in ipairs(tracerLines) do
+        if line then line:Destroy() end
     end
     tracerLines = {}
-    
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= client and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local line = Instance.new("Beam")
-            line.Color = ColorSequence.new(Color3.new(1,0,0))
-            line.Width0 = 0.2
-            line.Width1 = 0.2
-            line.Transparency = NumberSequence.new(0.3)
-            line.Attachment0 = Instance.new("Attachment", hrp)
-            line.Attachment1 = Instance.new("Attachment", p.Character.HumanoidRootPart)
-            line.Parent = workspace
-            table.insert(tracerLines, line)
-        end
+
+    for _, conn in ipairs(tracerConnections) do
+        conn:Disconnect()
     end
+    tracerConnections = {}
+end
+
+local function createTracerForPlayer(p)
+    if not tracersEnabled then return end
+    if p == client then return end
+
+    local function attachTracer(char)
+        local myHRP = getMyHRP()
+        if not myHRP then return end
+
+        local enemyHRP = char:WaitForChild("HumanoidRootPart",5)
+        if not enemyHRP then return end
+
+        local beam = Instance.new("Beam")
+        beam.Color = ColorSequence.new(Color3.new(1,0,0))
+        beam.Width0 = 0.2
+        beam.Width1 = 0.2
+        beam.Transparency = NumberSequence.new(0.3)
+
+        local att0 = Instance.new("Attachment")
+        att0.Parent = myHRP
+
+        local att1 = Instance.new("Attachment")
+        att1.Parent = enemyHRP
+
+        beam.Attachment0 = att0
+        beam.Attachment1 = att1
+        beam.Parent = workspace
+
+        table.insert(tracerLines, beam)
+    end
+
+    if p.Character then
+        attachTracer(p.Character)
+    end
+
+    table.insert(tracerConnections,
+        p.CharacterAdded:Connect(function(char)
+            task.wait(0.2)
+            attachTracer(char)
+        end)
+    )
+end
+
+----------------------------------------------------
+
+local function enableTracers()
+    clearTracers()
+    tracersEnabled = true
+
+    -- create for existing players
+    for _, p in ipairs(Players:GetPlayers()) do
+        createTracerForPlayer(p)
+    end
+
+    -- rebuild when new players join
+    table.insert(tracerConnections,
+        Players.PlayerAdded:Connect(function(p)
+            createTracerForPlayer(p)
+        end)
+    )
+
+    -- rebuild when YOU respawn
+    table.insert(tracerConnections,
+        client.CharacterAdded:Connect(function()
+            task.wait(0.3)
+            enableTracers()
+        end)
+    )
+
     notify("✅ Tracers enabled", currentTheme.accent)
 end
 
+----------------------------------------------------
+
 local function disableTracers()
-    for _, line in ipairs(tracerLines) do 
-        if line then line:Destroy() end 
-    end
-    tracerLines = {}
+    tracersEnabled = false
+    clearTracers()
     notify("❌ Tracers disabled", currentTheme.accent)
 end
 
